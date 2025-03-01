@@ -6,21 +6,22 @@ import edge_tts
 import asyncio
 import io
 
-
 import openai
 from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_sqlalchemy import SQLAlchemy
 from translate import Translator
 from gtts import gTTS
 
 from flask_cors import CORS
 
-
-
 from database import db
 from routes import routes
 
+# temas.json é para temas de redação
+# textos.json são textos para gerar audio para listening
+# textos_longos são para leitura reading
 
 
 # Carrega as variáveis de ambiente do .env
@@ -29,14 +30,26 @@ load_dotenv()
 # Inicializa o cliente OpenAI corretamente na versão 1.0+
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
-
 # Inicializa o Flask
 app = Flask(__name__)
 CORS(app)  # Habilita CORS para todas as rotas
 
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+app.config["JWT_TOKEN_LOCATION"] = ["headers"]  # Garante que o token é buscado apenas nos headers
+app.config["JWT_HEADER_NAME"] = "Authorization"  # Nome do header (padrão)
+app.config["JWT_HEADER_TYPE"] = "Bearer"  # Tipo do token (padrão)
+
+jwt = JWTManager(app)
 
 
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    return jsonify({"erro": "Token inválido ou expirado"}), 401
+
+
+@jwt.unauthorized_loader
+def missing_token_callback(error):
+    return jsonify({"erro": "Token ausente no header Authorization"}), 401
 
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -55,13 +68,22 @@ with app.app_context():
     db.create_all()
 
 
-
 @app.route('/', methods=['GET'])
 def hello():
     return "Hello World!"
 
 
+@app.route("/gerar-jwt", methods=["GET"])
+def gerar_jwt():
+    token = create_access_token(identity={"id": 1, "nome": "Gabriel", "email": "gabriel@gmail.com"})
+    return jsonify({"token": token})
 
+
+@app.route("/teste-jwt", methods=["GET"])
+@jwt_required()  # Requer um token JWT válido
+def teste_jwt():
+    usuario = get_jwt_identity()  # Obtém a identidade do usuário do token
+    return jsonify({"mensagem": f"JWT válido! Usuário: {usuario}"}), 200
 
 
 def sendPrompt(prompt):
@@ -74,6 +96,7 @@ def sendPrompt(prompt):
         return response.choices[0].message.content
     except Exception as e:
         return str(e)
+
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -89,20 +112,10 @@ def chat():
     return jsonify({"response": response})
 
 
-
-# temas.json é para temas de redação
-# textos.json são textos para gerar audio para listening
-# textos_longos são para leitura reading
-
-
-
-
-
-
-
 # Carregar o arquivo JSON com os textos
 with open('textos.json', 'r', encoding='utf-8') as file:
     textos = json.load(file)
+
 
 @app.route('/get-text', methods=['POST'])
 def get_text():
@@ -121,12 +134,10 @@ def get_text():
     return jsonify({'text': selected_text})
 
 
-
-
-
 # Carregar o arquivo JSON com os textos
 with open('temas.json', 'r', encoding='utf-8') as file:
     temas = json.load(file)
+
 
 @app.route('/get-temas', methods=['POST'])
 def get_temas():
@@ -145,11 +156,10 @@ def get_temas():
     return jsonify({'text': selected_tema})
 
 
-
-
 # Carregar o arquivo JSON com os textos
 with open('textos_longos.json', 'r', encoding='utf-8') as file:
     long_text = json.load(file)
+
 
 @app.route('/get-long-texts', methods=['POST'])
 def get_long_texts():
@@ -166,11 +176,6 @@ def get_long_texts():
     selected_long_text = random.choice(long_text[difficulty])
 
     return jsonify({'text': selected_long_text})
-
-
-
-
-
 
 
 async def generate_tts(text):
@@ -201,7 +206,6 @@ def tts():
     return send_file(audio_file, mimetype='audio/mp3')
 
 
-
 @app.route('/translate', methods=['POST'])
 def translate_text():
     """Recebe um texto e retorna a tradução para português"""
@@ -218,10 +222,6 @@ def translate_text():
         return jsonify({"text": translation})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-
-
 
 
 if __name__ == '__main__':
