@@ -11,6 +11,7 @@ from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import create_engine, text
 from translate import Translator
 from gtts import gTTS
 
@@ -52,10 +53,35 @@ def missing_token_callback(error):
     return jsonify({"erro": "Token ausente no header Authorization"}), 401
 
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(basedir, 'database', 'database.db')}"
+#basedir = os.path.abspath(os.path.dirname(__file__))
+#app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(basedir, 'database', 'database.db')}"
+#app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+
+
+
+# Ajusta a string do banco de dados para garantir compatibilidade
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
+
+
+# Adiciona SSL se necessário
+if "sslmode" not in DATABASE_URL:
+    DATABASE_URL += "?sslmode=require"
+
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Evita conexões quebradas
+    pool_recycle=300,  # Fecha conexões inativas após 5 minutos
+    pool_timeout=30  # Tempo limite para obter uma nova conexão
+)
+
+
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 
 # Inicializa o banco de dados
 db.init_app(app)
@@ -68,9 +94,16 @@ with app.app_context():
     db.create_all()
 
 
-@app.route('/', methods=['GET'])
-def hello():
-    return "Hello World!"
+
+
+@app.route("/",  methods=['GET'])
+def teste_db():
+    try:
+        result = db.session.execute(text("SELECT 'Conexão bem-sucedida!'")).fetchall()
+        return str(result)
+    except Exception as e:
+        return str(e)
+
 
 
 @app.route("/gerar-jwt", methods=["GET"])
