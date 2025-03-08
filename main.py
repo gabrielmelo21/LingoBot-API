@@ -1,19 +1,20 @@
 import json
 import os
 import random
-from io import BytesIO
+
 import edge_tts
 import asyncio
 import io
 
 import openai
+
 from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from flask_sqlalchemy import SQLAlchemy
+
 from sqlalchemy import create_engine, text
 from translate import Translator
-from gtts import gTTS
+
 
 from flask_cors import CORS
 
@@ -117,6 +118,48 @@ def gerar_jwt():
 def teste_jwt():
     usuario = get_jwt_identity()  # Obtém a identidade do usuário do token
     return jsonify({"mensagem": f"JWT válido! Usuário: {usuario}"}), 200
+
+
+
+
+
+
+@app.route('/transcribe', methods=['POST'])
+def transcribe_audio():
+    if 'file' not in request.files:
+        return jsonify({"error": "Nenhum arquivo enviado"}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({"error": "Arquivo sem nome"}), 400
+
+    try:
+        # Converte o arquivo para um formato compatível
+        audio_file = io.BytesIO(file.read())
+        audio_file.name = file.filename  # Atribuir nome ao arquivo
+
+        # Enviar para a OpenAI Whisper API
+        response = client.audio.transcriptions.create(
+            model="whisper-1",  # Modelo Whisper
+            file=audio_file,
+            response_format="json"
+        )
+
+        return jsonify({"text": response.text}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
 
 
 def sendPrompt(prompt):
