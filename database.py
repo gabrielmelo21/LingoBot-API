@@ -42,6 +42,15 @@ class Usuario(db.Model):
     ranking = db.Column(db.Integer, default=0)
     ip_address = db.Column(db.String(45), nullable=True)
 
+    # Niveis de Listening, Wrting, Speaking, Reading
+    listening = db.Column(db.Integer, default=1)
+    writing = db.Column(db.Integer, default=1)
+    reading = db.Column(db.Integer, default=1)
+    speaking = db.Column(db.Integer, default=1)
+
+    # Nivel do aluno, 1 é iniciante, 2 intermediario, 3 avançado, 4 nativo
+    nivel_aluno = db.Column(db.Integer, default=1)
+
     # Novo campo para metas diárias
     metasDiarias = db.Column(db.JSON, default=lambda: DEFAULT_METAS_DIARIAS.copy())
 

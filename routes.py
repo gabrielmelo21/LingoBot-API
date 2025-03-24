@@ -39,18 +39,6 @@ def criar_usuario():
     if Usuario.query.filter_by(ip_address=ip_usuario).count() >= max_contas_por_ip:
         return jsonify({"erro": "Limite de contas por IP atingido!"}), 403
 
-    # Verificar se já existe conta com o mesmo fingerprint
-    usuario_existente = Usuario.query.filter_by(
-        ip_address=ip_usuario,
-        device_type=dados.get("device_type"),
-        screen_resolution=dados.get("screen_resolution"),
-        language=dados.get("language"),
-        timezone=dados.get("timezone"),
-    ).first()
-
-    if usuario_existente:
-        return jsonify({"erro": "Parece que já existe uma conta cadastrada neste dispositivo."}), 403
-
     # Verificar se o usuário está tentando usar o próprio código de referência
     if "referal_code" in dados and dados["referal_code"]:
         usuario_referenciador = Usuario.query.filter_by(referal_code=dados["referal_code"]).first()
@@ -85,10 +73,6 @@ def criar_usuario():
         referal_code=referal_code,
         invited_by=dados.get("referal_code"),
         ip_address=ip_usuario,
-        device_type=dados.get("device_type"),
-        screen_resolution=dados.get("screen_resolution"),
-        language=dados.get("language"),
-        timezone=dados.get("timezone"),
     )
 
     db.session.add(novo_usuario)
@@ -103,6 +87,7 @@ def criar_usuario():
             db.session.commit()
 
     return jsonify({"mensagem": "Usuário criado com sucesso!"}), 201
+
 
 
 
