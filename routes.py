@@ -62,7 +62,7 @@ def criar_usuario():
     while Usuario.query.filter_by(referal_code=referal_code).first():
         referal_code = generate_referal_code()
 
-    # Criar novo usuário
+    # Criar novo usuário com dados de fingerprinting, mas sem proteção por eles
     novo_usuario = Usuario(
         nome=dados["nome"],
         sobrenome=dados.get("sobrenome"),
@@ -73,6 +73,10 @@ def criar_usuario():
         referal_code=referal_code,
         invited_by=dados.get("referal_code"),
         ip_address=ip_usuario,
+        device_type=dados.get("device_type"),  # Salvando o tipo de dispositivo
+        screen_resolution=dados.get("screen_resolution"),  # Salvando a resolução da tela
+        language=dados.get("language"),  # Salvando o idioma
+        timezone=dados.get("timezone"),  # Salvando o fuso horário
     )
 
     db.session.add(novo_usuario)
