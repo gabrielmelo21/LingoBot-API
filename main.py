@@ -95,8 +95,6 @@ with app.app_context():
     db.create_all()
 
 
-
-
 @app.route("/",  methods=['GET'])
 def teste_db():
     try:

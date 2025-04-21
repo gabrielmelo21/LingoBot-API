@@ -86,8 +86,8 @@ def criar_usuario():
     if novo_usuario.invited_by:
         usuario_referenciador = Usuario.query.filter_by(referal_code=novo_usuario.invited_by).first()
         if usuario_referenciador:
-            usuario_referenciador.tokens += 5000  # Adiciona 5000 tokens ao referenciador
-            usuario_referenciador.tokens_by_referral += 5000  # Soma os tokens no campo tokens_by_referral
+            usuario_referenciador.tokens += 100  # Adiciona 5000 tokens ao referenciador
+            usuario_referenciador.tokens_by_referral += 100  # Soma os tokens no campo tokens_by_referral
             db.session.commit()
 
     return jsonify({"mensagem": "Usuário criado com sucesso!"}), 201

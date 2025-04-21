@@ -48,8 +48,8 @@ class Usuario(db.Model):
     reading = db.Column(db.Integer, default=1)
     speaking = db.Column(db.Integer, default=1)
 
-    # Nivel do aluno, 1 é iniciante, 2 intermediario, 3 avançado, 4 nativo
-    nivel_aluno = db.Column(db.Integer, default=1)
+
+    difficulty = db.Column(db.String(50), default="medium")
 
     # Novo campo para metas diárias
     metasDiarias = db.Column(db.JSON, default=lambda: DEFAULT_METAS_DIARIAS.copy())
