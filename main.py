@@ -99,7 +99,7 @@ with app.app_context():
 def teste_db():
     try:
         result = db.session.execute(text("SELECT 'Conexão bem-sucedida!'")).fetchall()
-        return str(result + " teste funcionando")
+        return str(result)
     except Exception as e:
         return str(e)
 
