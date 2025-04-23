@@ -257,20 +257,18 @@ def listar_ranking():
     Retorna a lista dos usuários ordenados pelo ranking em ordem decrescente.
     Apenas os campos: nome, avatar, email e ranking são retornados.
     """
-    usuarios = Usuario.query.order_by(desc(Usuario.LingoEXP)).all()
+    usuarios = Usuario.query.order_by(desc(Usuario.ranking)).all()
 
     ranking = [
         {
             "nome": usuario.nome,
             "avatar": usuario.avatar,
             "email": usuario.email,
-            # renomeia LingoEXP para ranking
             "ranking": usuario.ranking
         }
         for usuario in usuarios
     ]
 
     return jsonify(ranking)
-
 
 
