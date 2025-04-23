@@ -251,12 +251,11 @@ def generate_new_jwt():
 
 
 
-
 @routes.route("/ranking", methods=["GET"])
 def listar_ranking():
     """
-    Retorna a lista dos usuários ordenados pelo LXP em ordem decrescente.
-    Apenas os campos: nome, avatar, email e LingoEXP são retornados.
+    Retorna a lista dos usuários ordenados pelo ranking em ordem decrescente.
+    Apenas os campos: nome, avatar, email e ranking são retornados.
     """
     usuarios = Usuario.query.order_by(desc(Usuario.LingoEXP)).all()
 
@@ -265,7 +264,8 @@ def listar_ranking():
             "nome": usuario.nome,
             "avatar": usuario.avatar,
             "email": usuario.email,
-            "LingoEXP": usuario.LingoEXP
+            # renomeia LingoEXP para ranking
+            "ranking": usuario.ranking
         }
         for usuario in usuarios
     ]
