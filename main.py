@@ -21,8 +21,6 @@ from flask_cors import CORS
 from database import db
 from routes import routes
 
-import assemblyai as aai
-
 # temas.json é para temas de redação
 # textos.json são textos para gerar audio para listening
 # textos_longos são para leitura reading
@@ -119,45 +117,6 @@ def gerar_jwt():
 def teste_jwt():
     usuario = get_jwt_identity()  # Obtém a identidade do usuário do token
     return jsonify({"mensagem": f"JWT válido! Usuário: {usuario}"}), 200
-
-
-
-
-
-
-@app.route('/transcribe', methods=['POST'])
-def transcribe_audio():
-    if 'file' not in request.files:
-        return jsonify({"error": "Nenhum arquivo enviado"}), 400
-
-    file = request.files['file']
-
-    if file.filename == '':
-        return jsonify({"error": "Arquivo sem nome"}), 400
-
-    try:
-        # Converte o arquivo para um formato compatível
-        audio_file = io.BytesIO(file.read())
-        audio_file.name = file.filename  # Atribuir nome ao arquivo
-
-        # Enviar para a OpenAI Whisper API
-        response = client.audio.transcriptions.create(
-            model="whisper-1",  # Modelo Whisper
-            file=audio_file,
-            response_format="json"
-        )
-
-        return jsonify({"text": response.text}), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-
-
-
-
-
 
 
 
@@ -299,53 +258,6 @@ def translate_text():
         return jsonify({"text": translation})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Substitua com sua chave da API
-aai.settings.api_key = "3ef14ff418c04d67982b282cbc6f7864"
-
-# Configuração da transcrição com modelo Nano e detecção de idioma
-config = aai.TranscriptionConfig(
-    speech_model=aai.SpeechModel.nano,
-    language_detection=True
-)
-
-@app.route("/transcribe", methods=["POST"])
-def transcribe_audio():
-    data = request.get_json()
-
-    # Validação básica
-    if not data or "audio_url" not in data:
-        return jsonify({"error": "Parâmetro 'audio_url' é obrigatório"}), 400
-
-    audio_url = data["audio_url"]
-    transcriber = aai.Transcriber(config=config)
-    transcript = transcriber.transcribe(audio_url)
-
-    if transcript.status == aai.TranscriptStatus.error:
-        return jsonify({"error": transcript.error}), 500
-
-    return jsonify({
-        "transcription": transcript.text
-    })
-
-
-
-
-
 
 
 if __name__ == '__main__':
