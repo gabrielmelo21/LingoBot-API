@@ -49,7 +49,7 @@ class Usuario(db.Model):
     speaking = db.Column(db.Integer, default=1)
     
     gemas = db.Column(db.Integer, default=10)
-    items = db.Column(db.Text, nullable=True)  
+    items = db.Column(db.Text, nullable=False)  
 
 
     difficulty = db.Column(db.String(50), default="medium")
@@ -66,7 +66,7 @@ class Usuario(db.Model):
     language = db.Column(db.String(50), nullable=True)
     timezone = db.Column(db.String(50), nullable=True)
 
-    def __init__(self, nome, sobrenome, email, password, avatar=None, gender=None, data_nascimento=None, referal_code=None, invited_by=None, ip_address=None, device_type=None, screen_resolution=None, language=None, timezone=None):
+    def __init__(self, nome, sobrenome, email, password, avatar=None, gender=None, data_nascimento=None, referal_code=None, invited_by=None, ip_address=None, device_type=None, screen_resolution=None, language=None, timezone=None, items=None):
         self.nome = nome
         self.sobrenome = sobrenome
         self.email = email
@@ -83,6 +83,8 @@ class Usuario(db.Model):
         self.screen_resolution = screen_resolution
         self.language = language
         self.timezone = timezone
+        self.items = items if items else json.dumps([])  # Valor padrão para items
+
 
 
 
