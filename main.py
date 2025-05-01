@@ -21,6 +21,8 @@ from flask_cors import CORS
 from database import db
 from routes import routes
 
+import assemblyai as aai
+
 # temas.json é para temas de redação
 # textos.json são textos para gerar audio para listening
 # textos_longos são para leitura reading
@@ -297,6 +299,53 @@ def translate_text():
         return jsonify({"text": translation})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Substitua com sua chave da API
+aai.settings.api_key = "3ef14ff418c04d67982b282cbc6f7864"
+
+# Configuração da transcrição com modelo Nano e detecção de idioma
+config = aai.TranscriptionConfig(
+    speech_model=aai.SpeechModel.nano,
+    language_detection=True
+)
+
+@app.route("/transcribe", methods=["POST"])
+def transcribe_audio():
+    data = request.get_json()
+
+    # Validação básica
+    if not data or "audio_url" not in data:
+        return jsonify({"error": "Parâmetro 'audio_url' é obrigatório"}), 400
+
+    audio_url = data["audio_url"]
+    transcriber = aai.Transcriber(config=config)
+    transcript = transcriber.transcribe(audio_url)
+
+    if transcript.status == aai.TranscriptStatus.error:
+        return jsonify({"error": transcript.error}), 500
+
+    return jsonify({
+        "transcription": transcript.text
+    })
+
+
+
+
+
 
 
 if __name__ == '__main__':

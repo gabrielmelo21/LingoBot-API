@@ -49,7 +49,8 @@ class Usuario(db.Model):
     speaking = db.Column(db.Integer, default=1)
     
     gemas = db.Column(db.Integer, default=10)
-    items = db.Column(db.Text, nullable=True)  
+ 
+    items = db.Column(db.Text, nullable=True) 
 
 
     difficulty = db.Column(db.String(50), default="medium")
