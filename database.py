@@ -1,6 +1,7 @@
 import bcrypt
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+import json
 
 db = SQLAlchemy()
 
@@ -60,13 +61,21 @@ class Usuario(db.Model):
     # Campo para tokens ganhos por referral
     tokens_by_referral = db.Column(db.Integer, default=0)
 
+
+
     # Campos separados para fingerprint
     device_type = db.Column(db.String(50), nullable=True)
     screen_resolution = db.Column(db.String(50), nullable=True)
     language = db.Column(db.String(50), nullable=True)
     timezone = db.Column(db.String(50), nullable=True)
 
-    def __init__(self, nome, sobrenome, email, password, avatar=None, gender=None, data_nascimento=None, referal_code=None, invited_by=None, ip_address=None, device_type=None, screen_resolution=None, language=None, timezone=None, items=None):
+
+    # Novo Campo battery
+    battery = db.Column(db.Integer, default=10)
+
+    def __init__(self, nome, sobrenome, email, password, avatar=None, gender=None, data_nascimento=None,
+                 referal_code=None, invited_by=None, ip_address=None, device_type=None,
+                 screen_resolution=None, language=None, timezone=None, items=None, battery=10):
         self.nome = nome
         self.sobrenome = sobrenome
         self.email = email
@@ -83,10 +92,8 @@ class Usuario(db.Model):
         self.screen_resolution = screen_resolution
         self.language = language
         self.timezone = timezone
-        self.items = items if items else json.dumps([])  # Valor padrão para items
-
-
-
+        self.items = items if items else json.dumps([])
+        self.battery = battery  # <- Aqui!
 
     def reset_metas_diarias(self):
         """Reseta as metas diárias do usuário"""
