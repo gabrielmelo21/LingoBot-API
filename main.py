@@ -1,33 +1,31 @@
 import json
 import os
 import random
+import tempfile
 
 import edge_tts
 import asyncio
 import io
-
 import openai
-
 from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-
 from sqlalchemy import create_engine, text
 from translate import Translator
-
-
 from flask_cors import CORS
-
 from database import db
 from routes import routes
-
-# temas.json é para temas de redação
-# textos.json são textos para gerar audio para listening
-# textos_longos são para leitura reading
+from flask_migrate import Migrate
+from routes import routes
+import assemblyai as aai
 
 
 # Carrega as variáveis de ambiente do .env
 load_dotenv()
+api_key = os.getenv("ASSEMBLYAI_API_KEY")
+
+# Configurar AssemblyAI
+aai.settings.api_key = api_key
 
 # Inicializa o cliente OpenAI corretamente na versão 1.0+
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -86,7 +84,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Inicializa o banco de dados
 db.init_app(app)
-
+migrate = Migrate(app, db)
 # Registra as rotas no app Flask
 app.register_blueprint(routes)
 
@@ -258,6 +256,50 @@ def translate_text():
         return jsonify({"text": translation})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+@app.route("/transcribe", methods=["POST"])
+def transcribe_audio():
+    if 'file' not in request.files:
+        return jsonify({"error": "Nenhum arquivo enviado"}), 400
+
+    file = request.files['file']
+
+    # Salvar arquivo temporariamente
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+        file.save(tmp.name)
+        audio_path = tmp.name
+
+    try:
+        config = aai.TranscriptionConfig(speech_model=aai.SpeechModel.best)
+        transcriber = aai.Transcriber(config=config)
+        transcript = transcriber.transcribe(audio_path)
+
+        if transcript.status == "error":
+            return jsonify({"error": transcript.error}), 500
+
+        return jsonify({ "text": transcript.text })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        os.remove(audio_path)
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
