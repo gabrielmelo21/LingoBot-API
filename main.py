@@ -276,7 +276,8 @@ def transcribe_audio():
         audio_path = tmp.name
 
     try:
-        config = aai.TranscriptionConfig(speech_model=aai.SpeechModel.best)
+        config = aai.TranscriptionConfig(speech_model=aai.SpeechModel.nano)
+
         transcriber = aai.Transcriber(config=config)
         transcript = transcriber.transcribe(audio_path)
 
