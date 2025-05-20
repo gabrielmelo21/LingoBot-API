@@ -63,7 +63,7 @@ def criar_usuario():
             "itemName": "OG Ticket",
             "dropRate": 0.01,
             "gemsValue": 50,
-            "rarity": "ultra_rare",
+            "rarity": "legendary",
             "itemSrc": "assets/lingobot/itens/og_ticket.png",
             "describe": "OG ticket é para os pioneiros.",
             "quant": 1
@@ -72,7 +72,7 @@ def criar_usuario():
             "itemName": "Beta Tester Ticket",
             "dropRate": 0.01,
             "gemsValue": 50,
-            "rarity": "ultra_rare",
+            "rarity": "legendary",
             "itemSrc": "assets/lingobot/itens/beta_tester_ticket.png",
             "describe": "Ticket dos escolhidos.",
             "quant": 1
