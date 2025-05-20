@@ -66,6 +66,9 @@ class Usuario(db.Model):
     language = db.Column(db.String(50), nullable=True)
     timezone = db.Column(db.String(50), nullable=True)
 
+    battery = db.Column(db.Integer, default=10)
+
+
     def __init__(self, nome, sobrenome, email, password, avatar=None, gender=None, data_nascimento=None, referal_code=None, invited_by=None, ip_address=None, device_type=None, screen_resolution=None, language=None, timezone=None, items=None):
         self.nome = nome
         self.sobrenome = sobrenome
