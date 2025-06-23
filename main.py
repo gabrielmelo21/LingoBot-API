@@ -1,20 +1,15 @@
-import json
 import os
-import random
 import tempfile
-
 import edge_tts
 import asyncio
 import io
-import openai
 from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import JWTManager
 from sqlalchemy import create_engine, text
 from translate import Translator
 from flask_cors import CORS
 from database import db
-from routes import routes
 from flask_migrate import Migrate
 from routes import routes
 import assemblyai as aai
@@ -27,8 +22,6 @@ api_key = os.getenv("ASSEMBLYAI_API_KEY")
 # Configurar AssemblyAI
 aai.settings.api_key = api_key
 
-# Inicializa o cliente OpenAI corretamente na versão 1.0+
-client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Inicializa o Flask
 app = Flask(__name__)
@@ -50,12 +43,6 @@ def invalid_token_callback(error):
 @jwt.unauthorized_loader
 def missing_token_callback(error):
     return jsonify({"erro": "Token ausente no header Authorization"}), 401
-
-
-#basedir = os.path.abspath(os.path.dirname(__file__))
-#app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(basedir, 'database', 'database.db')}"
-#app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
 
 
 
@@ -103,113 +90,6 @@ def teste_db():
         return str(e)
 
 
-
-@app.route("/gerar-jwt", methods=["GET"])
-def gerar_jwt():
-    token = create_access_token(identity={"id": 1, "nome": "Gabriel", "email": "gabriel@gmail.com"})
-    return jsonify({"token": token})
-
-
-@app.route("/teste-jwt", methods=["GET"])
-@jwt_required()  # Requer um token JWT válido
-def teste_jwt():
-    usuario = get_jwt_identity()  # Obtém a identidade do usuário do token
-    return jsonify({"mensagem": f"JWT válido! Usuário: {usuario}"}), 200
-
-
-
-
-
-def sendPrompt(prompt):
-    """Envia um prompt para a OpenAI e retorna a resposta"""
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Ou outro modelo disponível
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return str(e)
-
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    """Endpoint que recebe um prompt e retorna a resposta da OpenAI"""
-    data = request.json
-    prompt = data.get("prompt", "")
-
-    if not prompt:
-        return jsonify({"error": "Prompt é obrigatório"}), 400
-
-    response = sendPrompt(prompt)
-    print(response)
-    return jsonify({"response": response})
-
-
-# Carregar o arquivo JSON com os textos
-with open('textos.json', 'r', encoding='utf-8') as file:
-    textos = json.load(file)
-
-
-@app.route('/get-text', methods=['POST'])
-def get_text():
-    # Pega a dificuldade enviada pelo usuário
-    data = request.get_json()
-
-    # Verifica se a dificuldade foi fornecida e está correta
-    difficulty = data.get('difficulty')
-
-    if difficulty not in textos:
-        return jsonify({'error': 'Dificuldade inválida. Escolha entre easy, medium ou hard.'}), 400
-
-    # Escolhe um texto aleatório da dificuldade solicitada
-    selected_text = random.choice(textos[difficulty])
-
-    return jsonify({'text': selected_text})
-
-
-# Carregar o arquivo JSON com os textos
-with open('temas.json', 'r', encoding='utf-8') as file:
-    temas = json.load(file)
-
-
-@app.route('/get-temas', methods=['POST'])
-def get_temas():
-    # Pega a dificuldade enviada pelo usuário
-    data = request.get_json()
-
-    # Verifica se a dificuldade foi fornecida e está correta
-    difficulty = data.get('difficulty')
-
-    if difficulty not in temas:
-        return jsonify({'error': 'Dificuldade inválida. Escolha entre easy, medium ou hard.'}), 400
-
-    # Escolhe um texto aleatório da dificuldade solicitada
-    selected_tema = random.choice(temas[difficulty])
-
-    return jsonify({'text': selected_tema})
-
-
-# Carregar o arquivo JSON com os textos
-with open('textos_longos.json', 'r', encoding='utf-8') as file:
-    long_text = json.load(file)
-
-
-@app.route('/get-long-texts', methods=['POST'])
-def get_long_texts():
-    # Pega a dificuldade enviada pelo usuário
-    data = request.get_json()
-
-    # Verifica se a dificuldade foi fornecida e está correta
-    difficulty = data.get('difficulty')
-
-    if difficulty not in long_text:
-        return jsonify({'error': 'Dificuldade inválida. Escolha entre easy, medium ou hard.'}), 400
-
-    # Escolhe um texto aleatório da dificuldade solicitada
-    selected_long_text = random.choice(long_text[difficulty])
-
-    return jsonify({'text': selected_long_text})
 
 
 async def generate_tts(text):
@@ -259,10 +139,6 @@ def translate_text():
 
 
 
-
-
-
-
 @app.route("/transcribe", methods=["POST"])
 def transcribe_audio():
     if 'file' not in request.files:
@@ -289,17 +165,6 @@ def transcribe_audio():
         return jsonify({"error": str(e)}), 500
     finally:
         os.remove(audio_path)
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
