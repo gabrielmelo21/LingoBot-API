@@ -37,8 +37,10 @@ class Usuario(db.Model):
     difficulty = db.Column(db.String(50), default="easy")
     battery = db.Column(db.Integer, default=10)
 
+    learning = db.Column(db.String(50), default="english")
+
     def __init__(self, nome, sobrenome, email, password, gender=None, data_nascimento=None,
-                 referal_code=None, invited_by=None, items=None, plano=None):
+                 referal_code=None, invited_by=None, items=None, plano=None, learning=None):
         self.nome = nome
         self.sobrenome = sobrenome
         self.email = email
@@ -50,6 +52,7 @@ class Usuario(db.Model):
         self.invited_by = invited_by
         self.items = items if items else json.dumps([])
         self.plano = plano if plano else "free"
+        self.learning = "english"
 
     def update_user(self, **kwargs):
         """Atualiza os dados do usuário"""
