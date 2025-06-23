@@ -1,3 +1,5 @@
+from email.policy import default
+
 import bcrypt
 import json
 from flask_sqlalchemy import SQLAlchemy
@@ -18,7 +20,7 @@ class Usuario(db.Model):
     gender = db.Column(db.String(50))
     data_nascimento = db.Column(db.String(50))
     tokens = db.Column(db.Integer, default=0)
-    plano = db.Column(db.String(50))
+    plano = db.Column(db.String(50), default="free")
     created_at = db.Column(db.String(50))
     referal_code = db.Column(db.String(50), unique=True, nullable=True)
     invited_by = db.Column(db.String(50), nullable=True)
@@ -35,8 +37,8 @@ class Usuario(db.Model):
     difficulty = db.Column(db.String(50), default="easy")
     battery = db.Column(db.Integer, default=10)
 
-    def __init__(self, nome, sobrenome, email, password, gender=None, data_nascimento=None, referal_code=None,
-                 invited_by=None, items=None):
+    def __init__(self, nome, sobrenome, email, password, gender=None, data_nascimento=None,
+                 referal_code=None, invited_by=None, items=None, plano=None):
         self.nome = nome
         self.sobrenome = sobrenome
         self.email = email
@@ -47,6 +49,7 @@ class Usuario(db.Model):
         self.referal_code = referal_code
         self.invited_by = invited_by
         self.items = items if items else json.dumps([])
+        self.plano = plano if plano else "free"
 
     def update_user(self, **kwargs):
         """Atualiza os dados do usuário"""
