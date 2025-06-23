@@ -6,7 +6,7 @@ import io
 from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 from translate import Translator
 from flask_cors import CORS
 from database import db
@@ -90,6 +90,18 @@ def teste_db():
         return str(e)
 
 
+@app.route("/criar-tabela-usuarios", methods=["GET"])
+def criar_tabela_usuarios():
+    inspector = inspect(engine)
+    tabelas = inspector.get_table_names()
+
+    if "usuarios" in tabelas:
+        return "Tabela 'usuarios' já existe."
+
+    with app.app_context():
+        db.create_all()
+
+    return "Tabela 'usuarios' criada com sucesso."
 
 
 async def generate_tts(text):
