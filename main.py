@@ -3,6 +3,8 @@ import tempfile
 import edge_tts
 import asyncio
 import io
+
+import requests
 from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager
@@ -18,6 +20,9 @@ import assemblyai as aai
 # Carrega as variáveis de ambiente do .env
 load_dotenv()
 api_key = os.getenv("ASSEMBLYAI_API_KEY")
+
+
+
 
 # Configurar AssemblyAI
 aai.settings.api_key = api_key
@@ -178,6 +183,63 @@ def transcribe_audio():
     finally:
         os.remove(audio_path)
 
+
+GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY1")
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+
+
+@app.route('/api/gemini', methods=['POST'])
+def call_gemini():
+    try:
+        # Verifica se a chave API está configurada
+        if not GEMINI_API_KEY:
+            return jsonify({"error": "API key not configured"}), 500
+
+        # Obtém os dados da requisição
+        data = request.get_json()
+
+        # Verifica se o texto foi fornecido
+        if not data or 'text' not in data:
+            return jsonify({"error": "Text input is required"}), 400
+
+        # Prepara o payload para a API do Gemini
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": data['text']
+                        }
+                    ]
+                }
+            ]
+        }
+
+        # Faz a chamada para a API do Gemini
+        response = requests.post(
+            f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
+            headers={'Content-Type': 'application/json'},
+            json=payload
+        )
+
+        # Verifica se a resposta foi bem-sucedida
+        response.raise_for_status()
+
+        # Extrai apenas o texto da resposta
+        gemini_response = response.json()
+        if (gemini_response.get('candidates') and
+                gemini_response['candidates'][0].get('content') and
+                gemini_response['candidates'][0]['content'].get('parts') and
+                gemini_response['candidates'][0]['content']['parts'][0].get('text')):
+            text_response = gemini_response['candidates'][0]['content']['parts'][0]['text']
+            return text_response.strip()  # Retorna apenas o texto limpo
+
+        return jsonify({"error": "No text found in Gemini response"}), 500
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": "An unexpected error occurred"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
