@@ -109,32 +109,67 @@ def criar_tabela_usuarios():
     return "Tabela 'usuarios' criada com sucesso."
 
 
-async def generate_tts(text):
-    voice = "en-US-ChristopherNeural"  # Outra voz masculina robótica
+ELEVENLABS_KEY1 = os.getenv("ELEVENLABS_KEY1")
+ELEVENLABS_KEY2 = os.getenv("ELEVENLABS_KEY2")
+
+# Voz padrão que você pode customizar depois
+def get_default_voice_id():
+    return "EXAVITQu4vr4xnSDxMaL"  # Exemplo: "Adam" (vozes públicas)
+
+async def generate_tts_google(text):
+    voice = "en-US-ChristopherNeural"
     tts = edge_tts.Communicate(text, voice)
-
     audio_file = io.BytesIO()
-    temp_filename = "output.mp3"  # Nome temporário do arquivo
+    temp_filename = "output.mp3"
 
-    await tts.save(temp_filename)  # Salvar em um arquivo
+    await tts.save(temp_filename)
 
     with open(temp_filename, "rb") as f:
-        audio_file.write(f.read())  # Copiar para BytesIO
+        audio_file.write(f.read())
 
     audio_file.seek(0)
     return audio_file
 
+def generate_tts_elevenlabs(text, api_key):
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{get_default_voice_id()}"
+    headers = {
+        "xi-api-key": api_key,
+        "Content-Type": "application/json"
+    }
+    data = {
+        "text": text,
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.5
+        }
+    }
 
-@app.route('/tts', methods=['POST'])
+    try:
+        response = requests.post(url, json=data, headers=headers, timeout=10)
+        response.raise_for_status()
+        audio_file = io.BytesIO(response.content)
+        audio_file.seek(0)
+        return audio_file
+    except Exception as e:
+        print(f"Erro com a ElevenLabs (key {api_key[:10]}...):", e)
+        return None
+
+@app.route("/tts", methods=["POST"])
 def tts():
     data = request.get_json()
-    text = data.get('text', '')
+    text = data.get("text", "")
 
     if not text:
         return jsonify({"error": "Texto é obrigatório"}), 400
 
-    audio_file = asyncio.run(generate_tts(text))
-    return send_file(audio_file, mimetype='audio/mp3')
+    audio = generate_tts_elevenlabs(text, ELEVENLABS_KEY1)
+    if not audio:
+        audio = generate_tts_elevenlabs(text, ELEVENLABS_KEY2)
+
+    if not audio:
+        audio = asyncio.run(generate_tts_google(text))
+
+    return send_file(audio, mimetype='audio/mp3')
 
 
 @app.route('/translate', methods=['POST'])
