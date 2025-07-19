@@ -88,6 +88,10 @@ with app.app_context():
 @app.route("/",  methods=['GET'])
 def teste_db():
     try:
+        # Debug - remova depois de testar
+        print("ELEVENLABS_KEY1 carregada:", ELEVENLABS_KEY1 is not None)
+        print("ELEVENLABS_KEY2 carregada:", ELEVENLABS_KEY2 is not None)
+
         result = db.session.execute(text("SELECT 'Conexão bem-sucedida!'")).fetchall()
         print("hello world")
         return str(result)
