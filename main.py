@@ -323,7 +323,5 @@ def tts():
         return jsonify({"error": "Erro ao gerar áudio com todos os serviços"}), 500
 
 
-
-
 if __name__ == '__main__':
     app.run(debug=True)
