@@ -5,6 +5,7 @@ import asyncio
 import io
 
 import requests
+from elevenlabs import ElevenLabs, VoiceSettings
 from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager
@@ -87,23 +88,21 @@ with app.app_context():
 
 
 
-ELEVENLABS_KEY1 = os.getenv("ELEVENLABS_KEY1")
-ELEVENLABS_KEY2 = os.getenv("ELEVENLABS_KEY2")
-
-
 
 @app.route("/",  methods=['GET'])
 def teste_db():
     try:
-        # Debug - remova depois de testar
-        print("ELEVENLABS_KEY1 carregada:", ELEVENLABS_KEY1 is not None)
-        print("ELEVENLABS_KEY2 carregada:", ELEVENLABS_KEY2 is not None)
 
         result = db.session.execute(text("SELECT 'Conexão bem-sucedida!'")).fetchall()
         print("hello world")
         return str(result)
     except Exception as e:
         return str(e)
+
+
+
+
+
 
 
 @app.route("/criar-tabela-usuarios", methods=["GET"])
@@ -120,187 +119,7 @@ def criar_tabela_usuarios():
     return "Tabela 'usuarios' criada com sucesso."
 
 
-def get_default_voice_id():
-    """
-    Voice IDs públicos conhecidos da ElevenLabs
-    EXAVITQu4vr4xnSDxMaL = Bella (feminina, inglês)
-    """
-    return "EXAVITQu4vr4xnSDxMaL"
 
-
-def get_available_voices(api_key):
-    """Busca vozes disponíveis para validar se a chave funciona"""
-    url = "https://api.elevenlabs.io/v1/voices"
-    headers = {"xi-api-key": api_key}
-
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            voices = response.json()
-            return voices.get("voices", [])
-        else:
-            print(f"Erro ao buscar vozes: {response.status_code} - {response.text}")
-            return []
-    except Exception as e:
-        print(f"Erro ao conectar para buscar vozes: {e}")
-        return []
-
-
-async def generate_tts_google(text):
-    voice = "en-US-ChristopherNeural"
-    tts = edge_tts.Communicate(text, voice)
-    audio_file = io.BytesIO()
-    temp_filename = "output.mp3"
-
-    await tts.save(temp_filename)
-
-    with open(temp_filename, "rb") as f:
-        audio_file.write(f.read())
-
-    audio_file.seek(0)
-    return audio_file
-
-
-def generate_tts_elevenlabs(text, api_key):
-    """
-    Gera TTS usando ElevenLabs com parâmetros corretos da documentação oficial
-    """
-    if not api_key:
-        print("API key não fornecida")
-        return None
-
-    voice_id = get_default_voice_id()
-
-    # URL correta conforme documentação oficial
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-
-    headers = {
-        "xi-api-key": api_key,
-        "Content-Type": "application/json"
-    }
-
-    # Dados conforme documentação oficial da ElevenLabs
-    data = {
-        "text": text,
-        "model_id": "eleven_multilingual_v2",  # Modelo padrão recomendado
-        "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.5,
-            "style": 0.0,
-            "use_speaker_boost": True
-        }
-    }
-
-    try:
-        response = requests.post(url, json=data, headers=headers, timeout=30)
-
-        # Debug detalhado dos erros
-        print(f"ElevenLabs Status: {response.status_code}")
-        print(f"Voice ID: {voice_id}")
-        print(f"API Key (primeiros 10): {api_key[:10]}...")
-
-        if response.status_code == 401:
-            print("❌ Erro 401: Chave API inválida, expirada ou sem permissão")
-            print("Response:", response.text)
-            return None
-        elif response.status_code == 422:
-            print("❌ Erro 422: Parâmetros inválidos na requisição")
-            print("Response:", response.text)
-            return None
-        elif response.status_code == 429:
-            print("❌ Erro 429: Rate limit atingido ou cota excedida")
-            print("Response:", response.text)
-            return None
-        elif response.status_code == 400:
-            print("❌ Erro 400: Requisição malformada")
-            print("Response:", response.text)
-            return None
-
-        # Levanta exceção para outros códigos de erro
-        response.raise_for_status()
-
-        # Verifica se realmente recebeu áudio
-        content_type = response.headers.get('content-type', '')
-        if not content_type.startswith('audio/'):
-            print(f"❌ Resposta não é áudio. Content-Type: {content_type}")
-            print("Response preview:", response.text[:200] if response.text else "No text")
-            return None
-
-        print("✅ ElevenLabs TTS gerado com sucesso!")
-        audio_file = io.BytesIO(response.content)
-        audio_file.seek(0)
-        return audio_file
-
-    except requests.exceptions.Timeout:
-        print(f"❌ Timeout na requisição para ElevenLabs")
-        return None
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Erro de conexão com ElevenLabs (key {api_key[:10]}...): {e}")
-        return None
-    except Exception as e:
-        print(f"❌ Erro inesperado com ElevenLabs (key {api_key[:10]}...): {e}")
-        return None
-
-
-@app.route("/tts", methods=["POST"])
-def tts():
-    data = request.get_json()
-    text = data.get("text", "")
-
-    if not text:
-        return jsonify({"error": "Texto é obrigatório"}), 400
-
-    print(f"\n=== Iniciando TTS para: '{text[:50]}...' ===")
-
-    # Tenta primeira chave ElevenLabs
-    if ELEVENLABS_KEY1:
-        print("🔄 Tentando ElevenLabs KEY1...")
-        audio = generate_tts_elevenlabs(text, ELEVENLABS_KEY1)
-        if audio:
-            print("✅ Sucesso com KEY1!")
-            return send_file(audio, mimetype='audio/mp3')
-
-    # Tenta segunda chave ElevenLabs
-    if ELEVENLABS_KEY2:
-        print("🔄 Tentando ElevenLabs KEY2...")
-        audio = generate_tts_elevenlabs(text, ELEVENLABS_KEY2)
-        if audio:
-            print("✅ Sucesso com KEY2!")
-            return send_file(audio, mimetype='audio/mp3')
-
-    # Fallback para Edge TTS
-    print("🔄 Fallback para Edge TTS...")
-    try:
-        audio = asyncio.run(generate_tts_google(text))
-        print("✅ Sucesso com Edge TTS!")
-        return send_file(audio, mimetype='audio/mp3')
-    except Exception as e:
-        print(f"❌ Erro no Edge TTS: {e}")
-        return jsonify({"error": "Todos os serviços de TTS falharam"}), 500
-
-
-# Função para testar as chaves (execute separadamente para debug)
-def test_keys():
-    """Função para testar as chaves ElevenLabs"""
-    print("=== TESTE DAS CHAVES ELEVENLABS ===")
-
-    if ELEVENLABS_KEY1:
-        print(f"\n--- Testando KEY1 ({ELEVENLABS_KEY1[:15]}...) ---")
-        voices = get_available_voices(ELEVENLABS_KEY1)
-        if voices:
-            print(f"✅ KEY1 OK - {len(voices)} vozes disponíveis")
-            print(f"Primeira voz: {voices[0]['name']} (ID: {voices[0]['voice_id']})")
-        else:
-            print("❌ KEY1 FALHOU - Não conseguiu buscar vozes")
-
-    if ELEVENLABS_KEY2:
-        print(f"\n--- Testando KEY2 ({ELEVENLABS_KEY2[:15]}...) ---")
-        voices = get_available_voices(ELEVENLABS_KEY2)
-        if voices:
-            print(f"✅ KEY2 OK - {len(voices)} vozes disponíveis")
-            print(f"Primeira voz: {voices[0]['name']} (ID: {voices[0]['voice_id']})")
-        else:
-            print("❌ KEY2 FALHOU - Não conseguiu buscar vozes")
 
 
 @app.route('/translate', methods=['POST'])
@@ -406,6 +225,105 @@ def call_gemini():
         return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": "An unexpected error occurred"}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ELEVENLABS_KEY1 = os.getenv("ELEVENLABS_KEY1")
+ELEVENLABS_KEY2 = os.getenv("ELEVENLABS_KEY2")
+
+
+# Mapeamento indexado das vozes disponíveis
+VOICE_IDS = [
+    "TxGEqnHWrfWFTfGW9XjX",  # 0 - Josh
+    "pNInz6obpgDQGcFmaJgB",  # 1 - Adam
+    "onwK4e9ZLuTAKqWW03F9",  # 2 - James
+    "yoZ06aMxZJJ28mfd3POQ",  # 3 - Sam
+    "VR6AewLTigWG4xSOukaG",  # 4 - Arnold
+    "EXAVITQu4vr4xnSDxMaL",  # 5 - Bella (feminina padrão)
+]
+
+
+async def generate_tts_google(text):
+    tts = edge_tts.Communicate(text, "en-US-ChristopherNeural")
+    temp_filename = "output.mp3"
+    await tts.save(temp_filename)
+    with open(temp_filename, "rb") as f:
+        buffer = io.BytesIO(f.read())
+    buffer.seek(0)
+    return buffer
+
+def generate_tts_with_elevenlabs(api_key, text, voice_id):
+    try:
+        client = ElevenLabs(api_key=api_key)
+        stream = client.text_to_speech.convert(
+            text=text,
+            voice_id=voice_id,
+            model_id="eleven_multilingual_v2",
+            output_format="mp3_22050_32",
+            voice_settings=VoiceSettings(
+                stability=0.5,
+                similarity_boost=0.75,
+                style=0.0,
+                use_speaker_boost=True
+            )
+        )
+
+        buffer = io.BytesIO()
+        for chunk in stream:
+            buffer.write(chunk)
+        buffer.seek(0)
+        return buffer
+
+    except Exception as e:
+        print(f"❌ Falha com API key ({api_key[:10]}...): {e}")
+        return None
+
+
+@app.route("/tts", methods=["POST"])
+def tts():
+    data = request.get_json()
+    text = data.get("text", "").strip()
+    voice_index = data.get("voice", len(VOICE_IDS) - 1)  # Padrão: Bella (última da lista)
+
+    if not text:
+        return jsonify({"error": "Texto é obrigatório"}), 400
+
+    if not isinstance(voice_index, int) or voice_index < 0 or voice_index >= len(VOICE_IDS):
+        return jsonify({"error": "Índice de voz inválido"}), 400
+
+    voice_id = VOICE_IDS[voice_index]
+    print(f"🔊 Gerando TTS para: {text[:60]}... (voz {voice_index})")
+
+    # Tenta com as duas API keys do ElevenLabs
+    for key in [ELEVENLABS_KEY1, ELEVENLABS_KEY2]:
+        if key:
+            audio = generate_tts_with_elevenlabs(key, text, voice_id)
+            if audio:
+                print("✅ Áudio gerado com ElevenLabs")
+                return send_file(audio, mimetype="audio/mp3")
+
+    # Fallback: Edge TTS
+    print("⚠️ Falha com ElevenLabs, tentando Google TTS (edge-tts)...")
+    try:
+        audio = asyncio.run(generate_tts_google(text))
+        return send_file(audio, mimetype="audio/mp3")
+    except Exception as e:
+        print(f"❌ Falha total: {e}")
+        return jsonify({"error": "Erro ao gerar áudio com todos os serviços"}), 500
+
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
