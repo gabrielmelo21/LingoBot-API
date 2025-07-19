@@ -85,6 +85,13 @@ with app.app_context():
     db.create_all()
 
 
+
+
+ELEVENLABS_KEY1 = os.getenv("ELEVENLABS_KEY1")
+ELEVENLABS_KEY2 = os.getenv("ELEVENLABS_KEY2")
+
+
+
 @app.route("/",  methods=['GET'])
 def teste_db():
     try:
@@ -113,12 +120,31 @@ def criar_tabela_usuarios():
     return "Tabela 'usuarios' criada com sucesso."
 
 
-ELEVENLABS_KEY1 = os.getenv("ELEVENLABS_KEY1")
-ELEVENLABS_KEY2 = os.getenv("ELEVENLABS_KEY2")
-
-# Voz padrão que você pode customizar depois
 def get_default_voice_id():
-    return "EXAVITQu4vr4xnSDxMaL"  # Exemplo: "Adam" (vozes públicas)
+    """
+    Voice IDs públicos conhecidos da ElevenLabs
+    EXAVITQu4vr4xnSDxMaL = Bella (feminina, inglês)
+    """
+    return "EXAVITQu4vr4xnSDxMaL"
+
+
+def get_available_voices(api_key):
+    """Busca vozes disponíveis para validar se a chave funciona"""
+    url = "https://api.elevenlabs.io/v1/voices"
+    headers = {"xi-api-key": api_key}
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            voices = response.json()
+            return voices.get("voices", [])
+        else:
+            print(f"Erro ao buscar vozes: {response.status_code} - {response.text}")
+            return []
+    except Exception as e:
+        print(f"Erro ao conectar para buscar vozes: {e}")
+        return []
+
 
 async def generate_tts_google(text):
     voice = "en-US-ChristopherNeural"
@@ -134,29 +160,87 @@ async def generate_tts_google(text):
     audio_file.seek(0)
     return audio_file
 
+
 def generate_tts_elevenlabs(text, api_key):
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{get_default_voice_id()}"
+    """
+    Gera TTS usando ElevenLabs com parâmetros corretos da documentação oficial
+    """
+    if not api_key:
+        print("API key não fornecida")
+        return None
+
+    voice_id = get_default_voice_id()
+
+    # URL correta conforme documentação oficial
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+
     headers = {
         "xi-api-key": api_key,
         "Content-Type": "application/json"
     }
+
+    # Dados conforme documentação oficial da ElevenLabs
     data = {
         "text": text,
+        "model_id": "eleven_multilingual_v2",  # Modelo padrão recomendado
         "voice_settings": {
             "stability": 0.5,
-            "similarity_boost": 0.5
+            "similarity_boost": 0.5,
+            "style": 0.0,
+            "use_speaker_boost": True
         }
     }
 
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=10)
+        response = requests.post(url, json=data, headers=headers, timeout=30)
+
+        # Debug detalhado dos erros
+        print(f"ElevenLabs Status: {response.status_code}")
+        print(f"Voice ID: {voice_id}")
+        print(f"API Key (primeiros 10): {api_key[:10]}...")
+
+        if response.status_code == 401:
+            print("❌ Erro 401: Chave API inválida, expirada ou sem permissão")
+            print("Response:", response.text)
+            return None
+        elif response.status_code == 422:
+            print("❌ Erro 422: Parâmetros inválidos na requisição")
+            print("Response:", response.text)
+            return None
+        elif response.status_code == 429:
+            print("❌ Erro 429: Rate limit atingido ou cota excedida")
+            print("Response:", response.text)
+            return None
+        elif response.status_code == 400:
+            print("❌ Erro 400: Requisição malformada")
+            print("Response:", response.text)
+            return None
+
+        # Levanta exceção para outros códigos de erro
         response.raise_for_status()
+
+        # Verifica se realmente recebeu áudio
+        content_type = response.headers.get('content-type', '')
+        if not content_type.startswith('audio/'):
+            print(f"❌ Resposta não é áudio. Content-Type: {content_type}")
+            print("Response preview:", response.text[:200] if response.text else "No text")
+            return None
+
+        print("✅ ElevenLabs TTS gerado com sucesso!")
         audio_file = io.BytesIO(response.content)
         audio_file.seek(0)
         return audio_file
-    except Exception as e:
-        print(f"Erro com a ElevenLabs (key {api_key[:10]}...):", e)
+
+    except requests.exceptions.Timeout:
+        print(f"❌ Timeout na requisição para ElevenLabs")
         return None
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Erro de conexão com ElevenLabs (key {api_key[:10]}...): {e}")
+        return None
+    except Exception as e:
+        print(f"❌ Erro inesperado com ElevenLabs (key {api_key[:10]}...): {e}")
+        return None
+
 
 @app.route("/tts", methods=["POST"])
 def tts():
@@ -166,14 +250,57 @@ def tts():
     if not text:
         return jsonify({"error": "Texto é obrigatório"}), 400
 
-    audio = generate_tts_elevenlabs(text, ELEVENLABS_KEY1)
-    if not audio:
+    print(f"\n=== Iniciando TTS para: '{text[:50]}...' ===")
+
+    # Tenta primeira chave ElevenLabs
+    if ELEVENLABS_KEY1:
+        print("🔄 Tentando ElevenLabs KEY1...")
+        audio = generate_tts_elevenlabs(text, ELEVENLABS_KEY1)
+        if audio:
+            print("✅ Sucesso com KEY1!")
+            return send_file(audio, mimetype='audio/mp3')
+
+    # Tenta segunda chave ElevenLabs
+    if ELEVENLABS_KEY2:
+        print("🔄 Tentando ElevenLabs KEY2...")
         audio = generate_tts_elevenlabs(text, ELEVENLABS_KEY2)
+        if audio:
+            print("✅ Sucesso com KEY2!")
+            return send_file(audio, mimetype='audio/mp3')
 
-    if not audio:
+    # Fallback para Edge TTS
+    print("🔄 Fallback para Edge TTS...")
+    try:
         audio = asyncio.run(generate_tts_google(text))
+        print("✅ Sucesso com Edge TTS!")
+        return send_file(audio, mimetype='audio/mp3')
+    except Exception as e:
+        print(f"❌ Erro no Edge TTS: {e}")
+        return jsonify({"error": "Todos os serviços de TTS falharam"}), 500
 
-    return send_file(audio, mimetype='audio/mp3')
+
+# Função para testar as chaves (execute separadamente para debug)
+def test_keys():
+    """Função para testar as chaves ElevenLabs"""
+    print("=== TESTE DAS CHAVES ELEVENLABS ===")
+
+    if ELEVENLABS_KEY1:
+        print(f"\n--- Testando KEY1 ({ELEVENLABS_KEY1[:15]}...) ---")
+        voices = get_available_voices(ELEVENLABS_KEY1)
+        if voices:
+            print(f"✅ KEY1 OK - {len(voices)} vozes disponíveis")
+            print(f"Primeira voz: {voices[0]['name']} (ID: {voices[0]['voice_id']})")
+        else:
+            print("❌ KEY1 FALHOU - Não conseguiu buscar vozes")
+
+    if ELEVENLABS_KEY2:
+        print(f"\n--- Testando KEY2 ({ELEVENLABS_KEY2[:15]}...) ---")
+        voices = get_available_voices(ELEVENLABS_KEY2)
+        if voices:
+            print(f"✅ KEY2 OK - {len(voices)} vozes disponíveis")
+            print(f"Primeira voz: {voices[0]['name']} (ID: {voices[0]['voice_id']})")
+        else:
+            print("❌ KEY2 FALHOU - Não conseguiu buscar vozes")
 
 
 @app.route('/translate', methods=['POST'])
