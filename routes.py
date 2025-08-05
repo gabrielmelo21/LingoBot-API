@@ -197,7 +197,6 @@ def generate_new_jwt():
 
     if not dados:
         return jsonify({"erro": "Dados do usuário não fornecidos!"}), 400
-
     try:
         battery = int(battery)
     except (TypeError, ValueError):
