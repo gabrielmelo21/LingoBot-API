@@ -5,6 +5,8 @@ import json
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
+from sqlalchemy import CheckConstraint
+
 db = SQLAlchemy()
 
 
@@ -35,9 +37,15 @@ class Usuario(db.Model):
     gemas = db.Column(db.Integer, default=10)
     items = db.Column(db.Text, nullable=False)
     difficulty = db.Column(db.String(50), default="easy")
-    battery = db.Column(db.Integer, default=10)
+    battery = db.Column(db.Integer, default=10, nullable=False)
 
     learning = db.Column(db.String(50), default="english")
+
+
+
+    __table_args__ = (
+        CheckConstraint('battery >= 0 AND battery <= 10', name='check_battery_range'),
+    )
 
     def __init__(self, nome, sobrenome, email, password, gender=None, data_nascimento=None,
                  referal_code=None, invited_by=None, items=None, plano=None, learning=None):

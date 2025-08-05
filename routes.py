@@ -4,7 +4,7 @@ import re
 import string
 from datetime import timedelta
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import create_access_token, create_refresh_token
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from sqlalchemy import desc
 
 from database import db, Usuario
@@ -27,6 +27,17 @@ def verificar_senha(senha, senha_hash):
 
 def generate_referal_code():
     return ''.join(random.choices(string.digits, k=6))  # Gera um código de 6 números aleatórios
+
+@routes.route("/teste-jwt", methods=["GET"])
+@jwt_required()
+def teste_jwt():
+    identidade = get_jwt_identity()
+    return jsonify({
+        "mensagem": "JWT válido!",
+        "usuario": identidade
+    })
+
+
 
 
 
@@ -173,38 +184,52 @@ def obter_usuario(id):
 
 
 
-# Novo endpoint que atualiza o usuário e gera um novo JWT
-@routes.route("/generate-new-jwt", methods=["POST"])
-def generate_new_jwt():
-    dados = request.get_json()
 
-    if not dados:
-        return jsonify({"erro": "Dados do usuário não fornecidos!"}), 400
 
-    user_id = dados.get("id") or dados.get("sub")  # Pegamos o ID do usuário
 
-    if not user_id:
-        return jsonify({"erro": "ID do usuário não fornecido!"}), 400
+    def ajustar_bateria(usuario: Usuario, valor_novo: int):
+        valor_corrigido = max(0, min(10, valor_novo))
+        usuario.battery = valor_corrigido
 
-    # Verificamos se o usuário existe no banco de dados
-    usuario = Usuario.query.get(user_id)
 
-    if not usuario:
-        return jsonify({"erro": "Usuário não encontrado!"}), 404
+    @routes.route("/generate-new-jwt", methods=["POST"])
+    def generate_new_jwt():
+        dados = request.get_json()
 
-    # Apenas os campos válidos para atualização
-    campos_validos = {k: v for k, v in dados.items() if k in Usuario.__table__.columns.keys() and v is not None}
+        if not dados:
+            return jsonify({"erro": "Dados do usuário não fornecidos!"}), 400
 
-    # Atualizar usuário no banco de dados
+        user_id = dados.get("id") or dados.get("sub")
+
+        if not user_id:
+            return jsonify({"erro": "ID do usuário não fornecido!"}), 400
+
+        usuario = Usuario.query.get(user_id)
+
+        if not usuario:
+            return jsonify({"erro": "Usuário não encontrado!"}), 404
+
+    # Atualiza campos válidos
+    campos_validos = {
+        k: v for k, v in dados.items()
+        if k in Usuario.__table__.columns.keys() and v is not None
+    }
+
     for campo, valor in campos_validos.items():
-        setattr(usuario, campo, valor)
+        if campo == "battery":
+            try:
+                valor = int(valor)
+                ajustar_bateria(usuario, valor)
+            except ValueError:
+                return jsonify({"erro": "Valor inválido para bateria."}), 400
+        else:
+            setattr(usuario, campo, valor)
 
     db.session.commit()
 
-    # Criamos um novo JWT
     access_token = create_access_token(
         identity=str(user_id),
-        additional_claims=campos_validos,  # Apenas valores válidos
+        additional_claims=campos_validos,
         expires_delta=timedelta(days=7)
     )
 
