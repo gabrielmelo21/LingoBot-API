@@ -187,49 +187,49 @@ def obter_usuario(id):
 
 
 
-    def ajustar_bateria(usuario: Usuario, valor_novo: int):
-        valor_corrigido = max(0, min(10, valor_novo))
-        usuario.battery = valor_corrigido
 
 
-    @routes.route("/generate-new-jwt", methods=["POST"])
-    def generate_new_jwt():
-        dados = request.get_json()
+# Novo endpoint que atualiza o usuário e gera um novo JWT
+@routes.route("/generate-new-jwt", methods=["POST"])
+def generate_new_jwt():
+    dados = request.get_json()
+    battery = dados.get("battery")
 
-        if not dados:
-            return jsonify({"erro": "Dados do usuário não fornecidos!"}), 400
+    if not dados:
+        return jsonify({"erro": "Dados do usuário não fornecidos!"}), 400
 
-        user_id = dados.get("id") or dados.get("sub")
+    try:
+        battery = int(battery)
+    except (TypeError, ValueError):
+        return jsonify({"erro": "Battery precisa ser um número inteiro."}), 400
 
-        if not user_id:
-            return jsonify({"erro": "ID do usuário não fornecido!"}), 400
+    if not (0 <= battery <= 10):
+        return jsonify({"erro": "Valor de battery fora do padrão (0 a 10)."}), 400
 
-        usuario = Usuario.query.get(user_id)
+    user_id = dados.get("id") or dados.get("sub")  # Pegamos o ID do usuário
 
-        if not usuario:
-            return jsonify({"erro": "Usuário não encontrado!"}), 404
+    if not user_id:
+        return jsonify({"erro": "ID do usuário não fornecido!"}), 400
 
-    # Atualiza campos válidos
-    campos_validos = {
-        k: v for k, v in dados.items()
-        if k in Usuario.__table__.columns.keys() and v is not None
-    }
+    # Verificamos se o usuário existe no banco de dados
+    usuario = Usuario.query.get(user_id)
 
+    if not usuario:
+        return jsonify({"erro": "Usuário não encontrado!"}), 404
+
+    # Apenas os campos válidos para atualização
+    campos_validos = {k: v for k, v in dados.items() if k in Usuario.__table__.columns.keys() and v is not None}
+
+    # Atualizar usuário no banco de dados
     for campo, valor in campos_validos.items():
-        if campo == "battery":
-            try:
-                valor = int(valor)
-                ajustar_bateria(usuario, valor)
-            except ValueError:
-                return jsonify({"erro": "Valor inválido para bateria."}), 400
-        else:
-            setattr(usuario, campo, valor)
+        setattr(usuario, campo, valor)
 
     db.session.commit()
 
+    # Criamos um novo JWT
     access_token = create_access_token(
         identity=str(user_id),
-        additional_claims=campos_validos,
+        additional_claims=campos_validos,  # Apenas valores válidos
         expires_delta=timedelta(days=7)
     )
 
