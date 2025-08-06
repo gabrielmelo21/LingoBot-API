@@ -189,7 +189,6 @@ def obter_usuario(id):
 
 
 
-# Novo endpoint que atualiza o usuário e gera um novo JWT
 @routes.route("/generate-new-jwt", methods=["POST"])
 def generate_new_jwt():
     dados = request.get_json()
@@ -200,10 +199,13 @@ def generate_new_jwt():
         return jsonify({"erro": "Dados do usuário não fornecidos!"}), 400
     try:
         battery = int(battery)
-
         if battery > 10:
             battery = 10
+        elif battery < 0:
+            battery = 0
 
+
+        dados["battery"] = battery
 
     except (TypeError, ValueError):
         return jsonify({"erro": "Battery precisa ser um número inteiro."}), 400
