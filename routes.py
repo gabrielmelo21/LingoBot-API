@@ -188,35 +188,42 @@ def obter_usuario(id):
 
 
 
+
+# Novo endpoint que atualiza o usuário e gera um novo JWT
 @routes.route("/generate-new-jwt", methods=["POST"])
 def generate_new_jwt():
     dados = request.get_json()
+    battery = dados.get("battery")
+
 
     if not dados:
         return jsonify({"erro": "Dados do usuário não fornecidos!"}), 400
+    try:
+        battery = int(battery)
+
+        if battery > 10:
+            battery = 10
+
+
+    except (TypeError, ValueError):
+        return jsonify({"erro": "Battery precisa ser um número inteiro."}), 400
+
+    if not (0 <= battery <= 10):
+        return jsonify({"erro": "Valor de battery fora do padrão (0 a 10)."}), 400
 
     user_id = dados.get("id") or dados.get("sub")  # Pegamos o ID do usuário
+
     if not user_id:
         return jsonify({"erro": "ID do usuário não fornecido!"}), 400
 
     # Verificamos se o usuário existe no banco de dados
     usuario = Usuario.query.get(user_id)
+
     if not usuario:
         return jsonify({"erro": "Usuário não encontrado!"}), 404
 
     # Apenas os campos válidos para atualização
-    campos_validos = {
-        k: v for k, v in dados.items()
-        if k in Usuario.__table__.columns.keys() and v is not None
-    }
-
-    # Corrigir o valor de battery, se existir
-    if "battery" in campos_validos:
-        try:
-            battery = int(campos_validos["battery"])
-        except (TypeError, ValueError):
-            battery = usuario.battery  # mantém valor atual se for inválido
-        campos_validos["battery"] = max(0, min(10, battery))  # aplica o limite 0 a 10
+    campos_validos = {k: v for k, v in dados.items() if k in Usuario.__table__.columns.keys() and v is not None}
 
     # Atualizar usuário no banco de dados
     for campo, valor in campos_validos.items():
@@ -227,7 +234,7 @@ def generate_new_jwt():
     # Criamos um novo JWT
     access_token = create_access_token(
         identity=str(user_id),
-        additional_claims=campos_validos,
+        additional_claims=campos_validos,  # Apenas valores válidos
         expires_delta=timedelta(days=7)
     )
 
