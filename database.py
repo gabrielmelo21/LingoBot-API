@@ -36,6 +36,7 @@ class Usuario(db.Model):
 
     gemas = db.Column(db.Integer, default=10)
     items = db.Column(db.Text, nullable=False)
+    dailyMissions = db.Column(db.Text, nullable=False)
     difficulty = db.Column(db.String(50), default="easy")
     battery = db.Column(db.Integer, default=10, nullable=False)
 
@@ -48,7 +49,7 @@ class Usuario(db.Model):
     )
 
     def __init__(self, nome, sobrenome, email, password, gender=None, data_nascimento=None,
-                 referal_code=None, invited_by=None, items=None, plano=None, learning=None):
+                 referal_code=None, invited_by=None, items=None, plano=None, learning=None, dailyMissions=None):
         self.nome = nome
         self.sobrenome = sobrenome
         self.email = email
@@ -61,6 +62,21 @@ class Usuario(db.Model):
         self.items = items if items else json.dumps([])
         self.plano = plano if plano else "free"
         self.learning = "english"
+        default_daily_missions = {
+            "writing": False,
+            "reading": False,
+            "listening": False,
+            "speaking": False,
+            "chestWasOpen1": False,
+            "chestWasOpen2": False,
+            "chestWasOpen3": False,
+            "chestWasOpen4": False,
+            "strikes": 0,
+            "rewardPerChest": 5,
+            "chestsOpenedAt": 0,
+            "refreshTimeAt": 0
+        }
+        self.dailyMissions = dailyMissions if dailyMissions else json.dumps(default_daily_missions)
 
     def update_user(self, **kwargs):
         """Atualiza os dados do usuário"""

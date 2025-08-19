@@ -92,6 +92,22 @@ def criar_usuario():
         }
     ]
 
+    # Daily Missions iniciais
+    daily_missions_iniciais = {
+        "writing": False,
+        "reading": False,
+        "listening": False,
+        "speaking": False,
+        "chestWasOpen1": False,
+        "chestWasOpen2": False,
+        "chestWasOpen3": False,
+        "chestWasOpen4": False,
+        "strikes": 0,
+        "rewardPerChest": 5,
+        "chestsOpenedAt": 0,
+        "refreshTimeAt": 0
+    }
+
     # Criar novo usuário
     novo_usuario = Usuario(
         nome=dados["nome"],
@@ -102,7 +118,8 @@ def criar_usuario():
         data_nascimento=dados.get("data_nascimento"),
         referal_code=referal_code,
         invited_by=dados.get("referal_code"),
-        items=json.dumps(itens_iniciais)
+        items=json.dumps(itens_iniciais),
+        dailyMissions=json.dumps(daily_missions_iniciais)
     )
 
     db.session.add(novo_usuario)

@@ -1,0 +1,14 @@
+defaultData = {
+    writing: false,
+    reading: false,
+    listening: false,
+    speaking: false,
+    chestWasOpen1: false,
+    chestWasOpen2: false,
+    chestWasOpen3: false,
+    chestWasOpen4: false,
+    strikes: 0,
+    rewardPerChest: 5,
+    chestsOpenedAt: 0,
+    refreshTimeAt: 0
+  };
