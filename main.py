@@ -114,13 +114,16 @@ def criar_tabela_usuarios():
     inspector = inspect(engine)
     tabelas = inspector.get_table_names()
 
-    if "usuarios" in tabelas:
-        return "Tabela 'usuarios' já existe."
-
-    with app.app_context():
-        db.create_all()
-
-    return "Tabela 'usuarios' criada com sucesso."
+    if not tabelas:  # If no tables exist at all
+        with app.app_context():
+            db.create_all()
+        return "Banco de dados e tabelas criados com sucesso!"
+    elif "usuario" not in tabelas: # Check for 'usuario' table specifically
+        with app.app_context():
+            db.create_all()
+        return "Tabela 'usuario' e outras tabelas ausentes criadas com sucesso."
+    else:
+        return "Tabelas do banco de dados já existem."
 
 
 
