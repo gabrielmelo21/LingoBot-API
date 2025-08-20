@@ -242,7 +242,7 @@ def generate_new_jwt():
         return jsonify({"erro": "Usuário não encontrado!"}), 404
 
     # Apenas os campos válidos para atualização
-    campos_validos = {k: v for k, v in dados.items() if k in Usuario.__table__.columns.keys() and v is not None}
+    campos_validos = {k: v for k, v in dados.items() if k in Usuario.__table__.columns.keys() and v is not None and k != 'password'}
 
     # Se dailyMissions estiver presente e for um dicionário, converte para JSON string
     if "dailyMissions" in campos_validos and isinstance(campos_validos["dailyMissions"], dict):
