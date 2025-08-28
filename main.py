@@ -19,6 +19,9 @@ from flask_migrate import Migrate
 from routes import routes
 from ai_routes import ai
 import assemblyai as aai
+import json
+from datetime import datetime
+import pytz
 
 
 # Carrega as variáveis de ambiente do .env
@@ -135,6 +138,41 @@ def criar_tabela_usuarios():
         return "Tabela 'usuario' e outras tabelas ausentes criadas com sucesso."
     else:
         return "Tabelas do banco de dados já existem."
+
+
+@app.route("/ping", methods=["GET"])
+def ping():
+    try:
+        # Define o fuso horário de Brasília
+        brazilia_tz = pytz.timezone('America/Sao_Paulo')
+        # Obtém a hora atual no fuso horário de Brasília
+        now = datetime.now(brazilia_tz)
+        # Formata a data e hora no formato brasileiro
+        formatted_time = now.strftime("%d/%m/%Y %H:%M:%S")
+
+        ping_data = {"timestamp": formatted_time}
+        pings_file = "pings.json"
+        all_pings = []
+
+        # Lê o arquivo pings.json se ele existir
+        if os.path.exists(pings_file):
+            with open(pings_file, "r", encoding="utf-8") as f:
+                try:
+                    all_pings = json.load(f)
+                except json.JSONDecodeError:
+                    # Se o arquivo estiver vazio ou corrompido, inicia com uma lista vazia
+                    all_pings = []
+
+        # Adiciona o novo ping
+        all_pings.append(ping_data)
+
+        # Escreve de volta no arquivo
+        with open(pings_file, "w", encoding="utf-8") as f:
+            json.dump(all_pings, f, indent=4, ensure_ascii=False)
+
+        return jsonify({"mensagem": f"Ping registrado com sucesso: {formatted_time}"}), 200
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao registrar ping: {str(e)}"}), 500
 
 
 
