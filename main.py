@@ -96,10 +96,21 @@ with app.app_context():
 @app.route("/",  methods=['GET'])
 def teste_db():
     try:
+        inspector = inspect(engine)
+        tabelas = inspector.get_table_names()
 
-        result = db.session.execute(text("SELECT 'Conexão bem-sucedida!'")).fetchall()
-        print("hello world")
-        return str(result)
+        if not tabelas:
+            with app.app_context():
+                db.create_all()
+            return "Banco de dados e tabelas criados com sucesso na rota /!"
+        elif "usuario" not in tabelas:
+            with app.app_context():
+                db.create_all()
+            return "Tabela 'usuario' e outras tabelas ausentes criadas com sucesso na rota /."
+        else:
+            result = db.session.execute(text("SELECT 'Conexão bem-sucedida!'")).fetchall()
+            print("hello world")
+            return str(result)
     except Exception as e:
         return str(e)
 
