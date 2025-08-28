@@ -1,6 +1,10 @@
 import os
 import tempfile
+import threading
 import time
+import uuid
+from dataclasses import dataclass
+from typing import Optional, Dict
 
 import edge_tts
 import asyncio
@@ -98,6 +102,10 @@ with app.app_context():
 
 @app.route("/",  methods=['GET'])
 def teste_db():
+    with ping_lock:
+        ping_state.last_activity = time.time()
+
+
     try:
         inspector = inspect(engine)
         tabelas = inspector.get_table_names()
@@ -125,6 +133,10 @@ def teste_db():
 
 @app.route("/criar-tabela-usuarios", methods=["GET"])
 def criar_tabela_usuarios():
+    with ping_lock:
+        ping_state.last_activity = time.time()
+
+
     inspector = inspect(engine)
     tabelas = inspector.get_table_names()
 
@@ -138,42 +150,6 @@ def criar_tabela_usuarios():
         return "Tabela 'usuario' e outras tabelas ausentes criadas com sucesso."
     else:
         return "Tabelas do banco de dados já existem."
-
-
-@app.route("/ping", methods=["GET"])
-def ping():
-    try:
-        # Define o fuso horário de Brasília
-        brazilia_tz = pytz.timezone('America/Sao_Paulo')
-        # Obtém a hora atual no fuso horário de Brasília
-        now = datetime.now(brazilia_tz)
-        # Formata a data e hora no formato brasileiro
-        formatted_time = now.strftime("%d/%m/%Y %H:%M:%S")
-
-        ping_data = {"timestamp": formatted_time}
-        pings_file = "pings.json"
-        all_pings = []
-
-        # Lê o arquivo pings.json se ele existir
-        if os.path.exists(pings_file):
-            with open(pings_file, "r", encoding="utf-8") as f:
-                try:
-                    all_pings = json.load(f)
-                except json.JSONDecodeError:
-                    # Se o arquivo estiver vazio ou corrompido, inicia com uma lista vazia
-                    all_pings = []
-
-        # Adiciona o novo ping
-        all_pings.append(ping_data)
-
-        # Escreve de volta no arquivo
-        with open(pings_file, "w", encoding="utf-8") as f:
-            json.dump(all_pings, f, indent=4, ensure_ascii=False)
-
-        return jsonify({"mensagem": f"Ping registrado com sucesso: {formatted_time}"}), 200
-    except Exception as e:
-        return jsonify({"erro": f"Erro ao registrar ping: {str(e)}"}), 500
-
 
 
 
@@ -540,6 +516,212 @@ def tts():
 
 
 
+
+
+
+
+
+
+@dataclass
+class PingState:
+    is_warming_up: bool = False
+    warming_started_at: Optional[float] = None
+    warming_client_id: Optional[str] = None
+    last_activity: Optional[float] = None
+    waiting_clients: Dict[str, float] = None
+
+    def __post_init__(self):
+        if self.waiting_clients is None:
+            self.waiting_clients = {}
+
+
+# Estado global do sistema de ping
+ping_state = PingState()
+ping_lock = threading.Lock()
+
+# Configurações
+COLD_START_THRESHOLD = 10 * 60  # 10 minutos sem atividade = API fria
+WARMING_TIMEOUT = 30  # 30 segundos para considerar warming completo
+CLEANUP_INTERVAL = 60  # Limpar clientes antigos a cada 60s
+
+
+def is_api_cold() -> bool:
+    """Verifica se a API está fria (sem atividade recente)"""
+    if ping_state.last_activity is None:
+        return True
+    return time.time() - ping_state.last_activity > COLD_START_THRESHOLD
+
+
+def cleanup_old_waiting_clients():
+    """Remove clientes que estão esperando há muito tempo"""
+    current_time = time.time()
+    to_remove = []
+
+    for client_id, timestamp in ping_state.waiting_clients.items():
+        if current_time - timestamp > WARMING_TIMEOUT * 2:
+            to_remove.append(client_id)
+
+    for client_id in to_remove:
+        del ping_state.waiting_clients[client_id]
+
+
+def simulate_api_warming():
+    """Simula o processo de 'aquecimento' da API"""
+    # Aqui você colocaria a lógica real de warming up
+    # Por exemplo: conectar ao banco, carregar cache, etc.
+    time.sleep(2)  # Simula processo de warming
+
+
+@app.route('/ping', methods=['GET'])
+def coordinated_ping():
+    """
+    Endpoint de ping coordenado que gerencia cold starts de forma inteligente
+    """
+    client_id = request.args.get('client_id', str(uuid.uuid4()))
+    current_time = time.time()
+
+    with ping_lock:
+        # Limpa clientes antigos periodicamente
+        cleanup_old_waiting_clients()
+
+        # Se a API não está fria, responde imediatamente
+        if not is_api_cold():
+            ping_state.last_activity = current_time
+            return jsonify({
+                'status': 'ready',
+                'message': 'API is already warm',
+                'client_id': client_id,
+                'response_time_ms': 0
+            })
+
+        # Se já está em processo de warming
+        if ping_state.is_warming_up:
+            # Se este cliente já estava esperando, atualiza timestamp
+            ping_state.waiting_clients[client_id] = current_time
+
+            # Verifica se o warming expirou (timeout)
+            if (ping_state.warming_started_at and
+                    current_time - ping_state.warming_started_at > WARMING_TIMEOUT):
+                # Reset do estado - warming falhou
+                ping_state.is_warming_up = False
+                ping_state.warming_client_id = None
+                ping_state.warming_started_at = None
+                ping_state.waiting_clients.clear()
+
+                return jsonify({
+                    'status': 'warming_failed',
+                    'message': 'Previous warming attempt timed out, please try again',
+                    'client_id': client_id,
+                    'should_retry': True,
+                    'retry_after_ms': 3000
+                })
+
+            # Retorna que está em processo de warming
+            return jsonify({
+                'status': 'warming',
+                'message': f'API is warming up (started by another client)',
+                'client_id': client_id,
+                'warming_started_by': ping_state.warming_client_id,
+                'waiting_clients': len(ping_state.waiting_clients),
+                'should_retry': True,
+                'retry_after_ms': 5000
+            })
+
+        # Nenhum warming em progresso - este cliente será o escolhido
+        ping_state.is_warming_up = True
+        ping_state.warming_started_at = current_time
+        ping_state.warming_client_id = client_id
+        ping_state.waiting_clients[client_id] = current_time
+
+    # Este cliente foi escolhido para fazer o warming
+    start_time = time.time()
+
+    try:
+        # Executa o processo de warming
+        simulate_api_warming()
+
+        warming_duration = (time.time() - start_time) * 1000  # em ms
+
+        with ping_lock:
+            # Warming completo - atualiza estado
+            ping_state.is_warming_up = False
+            ping_state.last_activity = time.time()
+            ping_state.warming_started_at = None
+            ping_state.warming_client_id = None
+            waiting_count = len(ping_state.waiting_clients)
+            ping_state.waiting_clients.clear()
+
+        return jsonify({
+            'status': 'warmed_up',
+            'message': 'API successfully warmed up by this client',
+            'client_id': client_id,
+            'warming_duration_ms': round(warming_duration),
+            'waiting_clients_served': waiting_count
+        })
+
+    except Exception as e:
+        # Erro durante warming - reset do estado
+        with ping_lock:
+            ping_state.is_warming_up = False
+            ping_state.warming_started_at = None
+            ping_state.warming_client_id = None
+            ping_state.waiting_clients.clear()
+
+        return jsonify({
+            'status': 'warming_error',
+            'message': f'Error during warming: {str(e)}',
+            'client_id': client_id,
+            'should_retry': True,
+            'retry_after_ms': 5000
+        }), 500
+
+
+@app.route('/ping/status', methods=['GET'])
+def ping_status():
+    """Endpoint para verificar o status do sistema de ping"""
+    with ping_lock:
+        current_time = time.time()
+
+        return jsonify({
+            'is_api_cold': is_api_cold(),
+            'is_warming_up': ping_state.is_warming_up,
+            'warming_client_id': ping_state.warming_client_id,
+            'warming_duration_seconds': (
+                round(current_time - ping_state.warming_started_at, 2)
+                if ping_state.warming_started_at else None
+            ),
+            'waiting_clients_count': len(ping_state.waiting_clients),
+            'last_activity': (
+                datetime.fromtimestamp(ping_state.last_activity).isoformat()
+                if ping_state.last_activity else None
+            )
+        })
+
+
+@app.route('/ping/force-reset', methods=['POST'])
+def force_reset_ping():
+    """Endpoint para forçar reset do estado (útil para debug/admin)"""
+    with ping_lock:
+        ping_state.is_warming_up = False
+        ping_state.warming_started_at = None
+        ping_state.warming_client_id = None
+        ping_state.waiting_clients.clear()
+        ping_state.last_activity = None
+
+    return jsonify({
+        'status': 'reset',
+        'message': 'Ping state has been reset'
+    })
+
+
+# Simulação de outras rotas que indicam atividade da API
+@app.route('/api/some-endpoint', methods=['GET'])
+def some_endpoint():
+    """Exemplo de endpoint que atualiza a atividade da API"""
+    with ping_lock:
+        ping_state.last_activity = time.time()
+
+    return jsonify({'message': 'API is active'})
 
 if __name__ == '__main__':
     app.run(debug=True)
