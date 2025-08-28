@@ -37,6 +37,7 @@ class Usuario(db.Model):
     gemas = db.Column(db.Integer, default=10)
     items = db.Column(db.Text, nullable=False)
     dailyMissions = db.Column(db.Text, nullable=False)
+    achievements = db.Column(db.Text, nullable=False)
     difficulty = db.Column(db.String(50), default="easy")
     battery = db.Column(db.Integer, default=10, nullable=False)
 
@@ -49,7 +50,7 @@ class Usuario(db.Model):
     )
 
     def __init__(self, nome, sobrenome, email, password, gender=None, data_nascimento=None,
-                 referal_code=None, invited_by=None, items=None, plano=None, learning=None, dailyMissions=None):
+                 referal_code=None, invited_by=None, items=None, plano=None, learning=None, dailyMissions=None, achievements=None):
         self.nome = nome
         self.sobrenome = sobrenome
         self.email = email
@@ -77,6 +78,20 @@ class Usuario(db.Model):
             "refreshTimeAt": 0
         }
         self.dailyMissions = dailyMissions if dailyMissions else json.dumps(default_daily_missions)
+        default_achievements = {
+            "achievements": [
+                False, False, False, False, False,
+                False, False, False, False, False,
+                False, False, False, False, False,
+                False, False, False, False, False,
+                False, False, False, False, False,
+                False, False, False, False, False,
+                False, False, False, False, False,
+                False, False, False, False, False,
+                False, False, False, False, False
+            ]
+        }
+        self.achievements = achievements if achievements else json.dumps(default_achievements)
 
     def update_user(self, **kwargs):
         """Atualiza os dados do usuário"""

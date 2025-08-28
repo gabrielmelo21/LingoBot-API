@@ -108,6 +108,23 @@ def criar_usuario():
         "refreshTimeAt": 0
     }
 
+    # Achievements iniciais
+    achievements_iniciais = {
+      "achievements": [
+        False, False, False, False, False,
+        False, False, False, False, False,
+        False, False, False, False, False,
+        False, False, False, False, False,
+        False, False, False, False, False,
+        False, False, False, False, False,
+        False, False, False, False, False,
+        False, False, False, False, False,
+        False, False, False, False, False,
+        False, False, False, False, False,
+        False, False, False, False, False
+      ]
+    }
+
     # Criar novo usuário
     novo_usuario = Usuario(
         nome=dados["nome"],
@@ -119,7 +136,8 @@ def criar_usuario():
         referal_code=referal_code,
         invited_by=dados.get("referal_code"),
         items=json.dumps(itens_iniciais),
-        dailyMissions=json.dumps(daily_missions_iniciais)
+        dailyMissions=json.dumps(daily_missions_iniciais),
+        achievements=json.dumps(achievements_iniciais)
     )
 
     db.session.add(novo_usuario)
