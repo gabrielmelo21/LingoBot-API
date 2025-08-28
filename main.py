@@ -25,7 +25,7 @@ from ai_routes import ai
 import assemblyai as aai
 import json
 from datetime import datetime
-import pytz
+
 
 
 # Carrega as variáveis de ambiente do .env
