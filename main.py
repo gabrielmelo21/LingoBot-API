@@ -101,7 +101,6 @@ with app.app_context():
 def teste_db():
     PingManager.update_last_activity()
 
-
     try:
         inspector = inspect(engine)
         tabelas = inspector.get_table_names()
@@ -122,8 +121,10 @@ def teste_db():
         return str(e)
 
 
-
-
+@app.route("/ping",  methods=['GET'])
+def ping_system():
+    PingManager.update_last_activity()
+    return 'ok'
 
 
 
@@ -145,257 +146,6 @@ def criar_tabela_usuarios():
         return "Tabela 'usuario' e outras tabelas ausentes criadas com sucesso."
     else:
         return "Tabelas do banco de dados já existem."
-
-
-
-
-@app.route('/translate', methods=['POST'])
-def translate_text():
-    """Recebe um texto e retorna a tradução para português"""
-    data = request.get_json()
-    text = data.get('text', '')
-
-    if not text:
-        return jsonify({"error": "Texto é obrigatório"}), 400
-
-    try:
-        translator = Translator(to_lang="pt")
-        translation = translator.translate(text)
-        print(translation)  # Apenas para depuração no console
-        PingManager.update_last_activity()
-        return jsonify({"text": translation})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-
-@app.route("/transcribe", methods=["POST"])
-def transcribe_audio():
-    if 'file' not in request.files:
-        return jsonify({"error": "Nenhum arquivo enviado"}), 400
-
-    file = request.files['file']
-
-    # Salvar arquivo temporariamente
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
-        file.save(tmp.name)
-        audio_path = tmp.name
-
-    try:
-        config = aai.TranscriptionConfig(speech_model=aai.SpeechModel.best)
-        transcriber = aai.Transcriber(config=config)
-        transcript = transcriber.transcribe(audio_path)
-
-        if transcript.status == "error":
-            return jsonify({"error": transcript.error}), 500
-
-        PingManager.update_last_activity()
-        return jsonify({ "text": transcript.text })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    finally:
-        os.remove(audio_path)
-
-# Chaves de API do .env
-GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY1")
-MISTRAL_KEY = os.getenv("MISTRAL_KEY")
-
-# URLs das APIs
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-MISTRAL_API_URL = "https://api.mistral.ai/v1/chat/completions"
-
-
-def call_gemini(text):
-    """Função para chamar a API do Gemini"""
-    if not GEMINI_API_KEY:
-        raise Exception("Gemini API key not configured")
-
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": text}
-                ]
-            }
-        ]
-    }
-
-    response = requests.post(
-        f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
-        headers={'Content-Type': 'application/json'},
-        json=payload
-    )
-
-    response.raise_for_status()
-
-    gemini_response = response.json()
-    if (gemini_response.get('candidates') and
-            gemini_response['candidates'][0].get('content') and
-            gemini_response['candidates'][0]['content'].get('parts') and
-            gemini_response['candidates'][0]['content']['parts'][0].get('text')):
-        return gemini_response['candidates'][0]['content']['parts'][0]['text'].strip()
-
-    raise Exception("No text found in Gemini response")
-
-
-def call_mistral(text, max_retries=3):
-    """Função para chamar a API da Mistral com retry"""
-    if not MISTRAL_KEY:
-        raise Exception("Mistral API key not configured")
-
-    headers = {
-        "Authorization": f"Bearer {MISTRAL_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": "mistral-tiny",  # Você pode usar 'mistral-small' ou 'mistral-medium'
-        "messages": [
-            {"role": "user", "content": text}
-        ],
-        "temperature": 0.7,
-        "max_tokens": 2000
-    }
-
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(MISTRAL_API_URL, headers=headers, json=payload, timeout=30)
-
-            if response.status_code == 429 and attempt < max_retries - 1:
-                wait_time = 2 ** attempt
-                print(f"Mistral rate limited. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
-                time.sleep(wait_time)
-                continue
-
-            response.raise_for_status()
-
-            mistral_response = response.json()
-            if (mistral_response.get('choices') and
-                    mistral_response['choices'][0].get('message') and
-                    mistral_response['choices'][0]['message'].get('content')):
-                return mistral_response['choices'][0]['message']['content'].strip()
-
-            raise Exception("No text found in Mistral response")
-
-        except requests.exceptions.Timeout:
-            if attempt < max_retries - 1:
-                print(f"Mistral timeout. Retrying {attempt + 1}/{max_retries}")
-                time.sleep(1)
-                continue
-            else:
-                raise Exception("Mistral timeout after multiple attempts")
-
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"Mistral API request failed: {str(e)}")
-
-    raise Exception("Mistral retries exceeded")
-
-
-@app.route('/api/gemini', methods=['POST'])
-def call_ai():
-    try:
-        data = request.get_json()
-
-        if not data or 'text' not in data:
-            return jsonify({"error": "Text input is required"}), 400
-
-        text = data['text']
-        use_mistral = data.get('mistral', False)
-
-        # Forçar uso do Mistral
-        if use_mistral:
-            try:
-                response_text = call_mistral(text)
-                return response_text
-            except Exception as e:
-                return jsonify({"error": f"Mistral API error: {str(e)}"}), 500
-
-        # Usa Gemini por padrão
-        try:
-            response_text = call_gemini(text)
-            PingManager.update_last_activity()
-            return response_text
-        except Exception as gemini_error:
-            print(f"Gemini failed: {str(gemini_error)}. Trying Mistral as failover...")
-
-            # Failover: tenta Mistral se Gemini falhar
-            try:
-                response_text = call_mistral(text)
-                PingManager.update_last_activity()
-                return response_text
-            except Exception as mistral_error:
-                return jsonify({
-                    "error": "Both AI services failed",
-                    "gemini_error": str(gemini_error),
-                    "mistral_error": str(mistral_error)
-                }), 500
-
-    except Exception as e:
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
-
-
-
-
-
-
-COHERE_KEY = os.getenv("COHERE_KEY")
-COHERE_API_URL = "https://api.cohere.ai/v1/chat"
-
-
-
-def call_cohere(text):
-    """Função para chamar a API da Cohere"""
-    if not COHERE_KEY:
-        raise Exception("Cohere API key not configured")
-
-    headers = {
-        "Authorization": f"Bearer {COHERE_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "message": text,
-        "model": "command-r",  # Você pode mudar para outro como 'command-r-plus' se preferir
-        "temperature": 0.7,
-        "max_tokens": 1000
-    }
-
-    response = requests.post(COHERE_API_URL, headers=headers, json=payload)
-
-    response.raise_for_status()
-
-    data = response.json()
-    if 'text' in data:
-        return data['text'].strip()
-
-    raise Exception("No text found in Cohere response")
-
-
-
-
-@app.route('/cohere', methods=['POST'])
-def call_cohere_endpoint():
-    try:
-        data = request.get_json()
-
-        if not data or 'text' not in data:
-            return jsonify({"error": "Text input is required"}), 400
-
-        text = data['text']
-        response_text = call_cohere(text)
-        PingManager.update_last_activity()
-        return response_text
-
-    except Exception as e:
-        return jsonify({"error": f"Cohere API error: {str(e)}"}), 500
-
-
-
-
-
-
-
 
 
 
@@ -487,39 +237,6 @@ def tts():
     except Exception as e:
         print(f"❌ Falha total: {e}")
         return jsonify({"error": "Erro ao gerar áudio com todos os serviços"}), 500
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
