@@ -121,10 +121,94 @@ def teste_db():
         return str(e)
 
 
-@app.route("/ping",  methods=['GET'])
-def ping_system():
-    PingManager.update_last_activity()
-    return 'ok'
+@app.route('/ping', methods=['GET'])
+def coordinated_ping():
+    """
+    🎯 ENDPOINT PRINCIPAL - Sistema de Ping Coordenado
+    Substitui seu endpoint atual que retorna apenas 'ok'
+    """
+    client_id = request.args.get('client_id', str(uuid.uuid4()))
+
+    # Limpa clientes antigos periodicamente
+    PingManager._cleanup_old_waiting_clients()
+
+    # Se a API não está fria, responde imediatamente
+    if not PingManager.is_api_cold():
+        PingManager.update_last_activity()
+        return jsonify({
+            'status': 'ready',
+            'message': 'API is already warm',
+            'client_id': client_id,
+            'response_time_ms': 0
+        })
+
+    # Verifica se já está em processo de warming
+    warming_info = PingManager._get_warming_info()
+
+    if warming_info == 'timeout':
+        # Reset do estado - warming falhou
+        PingManager.force_reset()
+        return jsonify({
+            'status': 'warming_failed',
+            'message': 'Previous warming attempt timed out, please try again',
+            'client_id': client_id,
+            'should_retry': True,
+            'retry_after_ms': 3000
+        })
+
+    if warming_info is not None:
+        # Adiciona este cliente à lista de espera
+        PingManager._add_waiting_client(client_id)
+
+        # Retorna que está em processo de warming
+        return jsonify({
+            'status': 'warming',
+            'message': f'API is warming up (started by another client)',
+            'client_id': client_id,
+            'warming_started_by': warming_info['warming_client_id'],
+            'waiting_clients': warming_info['waiting_clients_count'],
+            'should_retry': True,
+            'retry_after_ms': 5000
+        })
+
+    # Nenhum warming em progresso - este cliente será o escolhido
+    PingManager._set_warming_state(client_id, True)
+    PingManager._add_waiting_client(client_id)
+
+    # Este cliente foi escolhido para fazer o warming
+    start_time = time.time()
+
+    try:
+        # Executa o processo de warming
+        simulate_api_warming()
+
+        warming_duration = (time.time() - start_time) * 1000  # em ms
+
+        # Warming completo - atualiza estado
+        PingManager.update_last_activity()
+        PingManager._set_warming_state(client_id, False)
+        waiting_count = len(PingManager._ping_state.waiting_clients)
+        PingManager._clear_waiting_clients()
+
+        return jsonify({
+            'status': 'warmed_up',
+            'message': 'API successfully warmed up by this client',
+            'client_id': client_id,
+            'warming_duration_ms': round(warming_duration),
+            'waiting_clients_served': waiting_count
+        })
+
+    except Exception as e:
+        # Erro durante warming - reset do estado
+        PingManager.force_reset()
+
+        return jsonify({
+            'status': 'warming_error',
+            'message': f'Error during warming: {str(e)}',
+            'client_id': client_id,
+            'should_retry': True,
+            'retry_after_ms': 5000
+        }), 500
 
 
 
