@@ -194,7 +194,10 @@ def coordinated_ping():
         # Warming completo - atualiza estado
         PingManager.update_last_activity()
         PingManager._set_warming_state(client_id, False)
-        waiting_count = len(PingManager._ping_state.waiting_clients)
+
+        # Pega a contagem antes de limpar
+        from ping_manager import _ping_state
+        waiting_count = len(_ping_state.waiting_clients)
         PingManager._clear_waiting_clients()
 
         return jsonify({
@@ -216,6 +219,16 @@ def coordinated_ping():
             'should_retry': True,
             'retry_after_ms': 5000
         }), 500
+
+
+# ==========================================
+# ENDPOINTS AUXILIARES (opcionais)
+# ==========================================
+
+@app.route('/ping/status', methods=['GET'])
+def ping_status():
+    """Endpoint para verificar o status do sistema de ping"""
+    return jsonify(PingManager.get_ping_state_info())
 
 
 
