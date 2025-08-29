@@ -11,6 +11,9 @@ from database import db, Usuario
 from email_validator import validate_email, EmailNotValidError
 import bcrypt
 
+from ping_manager import PingManager
+
+
 routes = Blueprint("routes", __name__)
 
 
@@ -150,6 +153,7 @@ def criar_usuario():
             usuario_referenciador.tokens += 100
             db.session.commit()
 
+    PingManager.update_last_activity()
     return jsonify({"mensagem": "Usuário criado com sucesso!"}), 201
 
 
@@ -172,6 +176,7 @@ def login():
                                        expires_delta=timedelta(days=7))
     refresh_token = create_refresh_token(identity=usuario.id, expires_delta=timedelta(days=30))
 
+    PingManager.update_last_activity()
     return jsonify(
         {"mensagem": "Login realizado com sucesso!", "access_token": access_token, "refresh_token": refresh_token}), 200
 
@@ -188,6 +193,7 @@ def atualizar_usuario(id):
             setattr(usuario, campo, valor)
 
     db.session.commit()
+    PingManager.update_last_activity()
     return jsonify({"mensagem": "Usuário atualizado com sucesso!"})
 
 
@@ -199,6 +205,7 @@ def deletar_usuario(id):
 
     db.session.delete(usuario)
     db.session.commit()
+    PingManager.update_last_activity()
     return jsonify({"mensagem": "Usuário deletado com sucesso!"})
 
 
@@ -206,6 +213,7 @@ def deletar_usuario(id):
 def listar_usuarios():
     usuarios = Usuario.query.all()
     lista_usuarios = [{campo: getattr(u, campo) for campo in Usuario.__table__.columns.keys()} for u in usuarios]
+    PingManager.update_last_activity()
     return jsonify(lista_usuarios)
 
 
@@ -215,6 +223,7 @@ def obter_usuario(id):
     if not usuario:
         return jsonify({"erro": "Usuário não encontrado"}), 404
 
+    PingManager.update_last_activity()
     return jsonify({campo: getattr(usuario, campo) for campo in Usuario.__table__.columns.keys()})
 
 
@@ -279,6 +288,7 @@ def generate_new_jwt():
         expires_delta=timedelta(days=7)
     )
 
+    PingManager.update_last_activity()
     return jsonify({
         "mensagem": "Novo JWT gerado e usuário atualizado com sucesso!",
         "access_token": access_token
@@ -306,6 +316,7 @@ def listar_ranking():
         for usuario in usuarios
     ]
 
+    PingManager.update_last_activity()
     return jsonify(ranking)
 
 

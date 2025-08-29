@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 
+from ping_manager import PingManager
+
 load_dotenv()
 
 # Criação do Blueprint
@@ -242,7 +244,9 @@ def call_ai():
         # Forçar uso apenas do Mistral
         if use_mistral:
             try:
-                return call_mistral(text)
+                response = call_mistral(text)
+                PingManager.update_last_activity()
+                return response
             except Exception as e:
                 return jsonify({"error": f"Mistral API error: {str(e)}"}), 500
 
@@ -256,37 +260,49 @@ def call_ai():
         # Forçar uso apenas do Groq
         if use_groq:
             try:
-                return call_groq(text)
+                response = call_groq(text)
+                PingManager.update_last_activity()
+                return response
             except Exception as e:
                 return jsonify({"error": f"Groq API error: {str(e)}"}), 500
 
         # Tentativa 1: Gemini
         try:
-            return call_gemini(text)
+            response = call_gemini(text)
+            PingManager.update_last_activity()
+            return response
         except Exception as gemini_error:
             print(f"Gemini failed: {str(gemini_error)}. Trying Mistral...")
 
             # Tentativa 2: Mistral
             try:
-                return call_mistral(text)
+                response = call_mistral(text)
+                PingManager.update_last_activity()
+                return response
             except Exception as mistral_error:
                 print(f"Mistral failed: {str(mistral_error)}. Trying Cohere...")
 
                 # Tentativa 3: Cohere
                 try:
-                    return call_cohere(text)
+                    response = call_cohere(text)
+                    PingManager.update_last_activity()
+                    return response
                 except Exception as cohere_error:
                     print(f"Cohere failed: {str(cohere_error)}. Trying Groq...")
 
                     # Tentativa 4: Groq
                     try:
-                        return call_groq(text)
+                        response = call_groq(text)
+                        PingManager.update_last_activity()
+                        return response
                     except Exception as groq_error:
                         print(f"Groq failed: {str(groq_error)}. Trying OpenRouter...")
 
                         # Tentativa 5: OpenRouter
                         try:
-                            return call_openrouter(text)
+                            response = call_openrouter(text)
+                            PingManager.update_last_activity()
+                            return response
                         except Exception as openrouter_error:
                             return jsonify({
                                 "error": "All AI services failed",
@@ -311,7 +327,9 @@ def cohere_route():
             return jsonify({"error": "Text input is required"}), 400
 
         text = data['text']
-        return call_cohere(text)
+        response = call_cohere(text)
+        PingManager.update_last_activity()
+        return response
 
     except Exception as e:
         return jsonify({"error": f"Cohere error: {str(e)}"}), 500
@@ -330,6 +348,7 @@ def ask_mistral():
 
     try:
         response = call_mistral(text)
+        PingManager.update_last_activity()
         return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -349,7 +368,9 @@ def call_groq_endpoint():
             return jsonify({"error": "Text input is required"}), 400
 
         text = data['text']
-        return call_groq(text)
+        response = call_groq(text)
+        PingManager.update_last_activity()
+        return response
 
     except Exception as e:
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
@@ -383,6 +404,7 @@ def ai_openrouter():
         response_text = call_openrouter(user_text)
 
         # Retorna apenas o texto puro
+        PingManager.update_last_activity()
         return response_text, 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
     except Exception as e:
@@ -429,4 +451,5 @@ def ai_benchmark():
     benchmark_model("Groq", call_groq)
     benchmark_model("OpenRouter", call_openrouter)
 
+    PingManager.update_last_activity()
     return jsonify(results)
