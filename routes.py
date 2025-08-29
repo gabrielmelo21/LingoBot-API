@@ -80,7 +80,7 @@ def criar_usuario():
             "dropRate": 0.01,
             "gemsValue": 20,
             "rarity": "legendary",
-            "itemSrc": "assets/lingobot/itens/og_ticket.png",
+            "itemSrc": "assets/lingobot/itens/og_ticket.webp",
             "describe": "OG ticket é para os pioneiros.",
             "quant": 1
         },
@@ -89,7 +89,7 @@ def criar_usuario():
             "dropRate": 0.01,
             "gemsValue": 20,
             "rarity": "legendary",
-            "itemSrc": "assets/lingobot/itens/beta_tester_ticket.png",
+            "itemSrc": "assets/lingobot/itens/beta_tester_ticket.webp",
             "describe": "Ticket dos escolhidos.",
             "quant": 1
         }
