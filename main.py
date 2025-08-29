@@ -1,6 +1,7 @@
 import os
 import tempfile
 import time
+import uuid
 
 import edge_tts
 import asyncio
@@ -119,6 +120,12 @@ def teste_db():
             return str(result)
     except Exception as e:
         return str(e)
+
+
+def simulate_api_warming():
+    """Sem warming real - apenas marca como pronto"""
+    print("🔥 API ready!")
+    return True
 
 
 @app.route('/ping', methods=['GET'])
